@@ -54,6 +54,9 @@ APP_LOCK_PATH = APP_DIR / "codex_balance_widget.lock"
 SETTINGS_PATH = APP_DIR / "codex_balance_widget_settings.json"
 HISTORY_PATH = APP_DIR / "codex_balance_history.json"
 SETTINGS_ICON_PATH = APP_DIR / "settings_icon.png"
+BLANK_WINDOW_ICON_PNG = (
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAJUlEQVR4nGP8//8/IwMFgIkSzaMGQAATA4WAadQAhtEwYKA8DABnpgMeG0xQggAAAABJRU5ErkJggg=="
+)
 
 REFRESH_SECONDS = 300
 COUNTDOWN_REFRESH_MS = 30_000
@@ -77,6 +80,13 @@ ORANGE = "#F79009"
 RED = "#D92D20"
 BLUE = "#2E90FA"
 GRID = "#EEF2F7"
+
+DEFAULT_LANGUAGE = "en"
+LANGUAGES = {"en", "ru"}
+
+
+def tr(language: str, en: str, ru: str) -> str:
+    return ru if language == "ru" else en
 
 
 MONTHS_RU = {
@@ -368,10 +378,10 @@ def format_target_time(reset_dt: datetime | None, reset_text: str | None) -> str
     return reset_dt.strftime("%d.%m.%Y %H:%M")
 
 
-def format_countdown(reset_dt: datetime | None, reset_text: str | None) -> str:
+def format_countdown(reset_dt: datetime | None, reset_text: str | None, language: str = DEFAULT_LANGUAGE) -> str:
     cleaned = normalize_reset_text(reset_text)
     if not cleaned:
-        return "Сброс: не найден"
+        return tr(language, "Reset: not found", "Сброс: не найден")
 
     if reset_dt is None:
         return cleaned
@@ -381,7 +391,7 @@ def format_countdown(reset_dt: datetime | None, reset_text: str | None) -> str:
     target = format_target_time(reset_dt, cleaned)
 
     if total_seconds <= 0:
-        return f"Сброс скоро - {target}"
+        return tr(language, f"Reset soon - {target}", f"Сброс скоро - {target}")
 
     minutes = max(1, total_seconds // 60)
     days, rest_minutes = divmod(minutes, 24 * 60)
@@ -389,15 +399,15 @@ def format_countdown(reset_dt: datetime | None, reset_text: str | None) -> str:
 
     if days > 0:
         if hours > 0:
-            duration = f"{days} д {hours} ч"
+            duration = tr(language, f"{days}d {hours}h", f"{days} д {hours} ч")
         else:
-            duration = f"{days} д"
+            duration = tr(language, f"{days}d", f"{days} д")
     elif hours > 0:
-        duration = f"{hours} ч {mins} мин" if mins else f"{hours} ч"
+        duration = tr(language, f"{hours}h {mins}m" if mins else f"{hours}h", f"{hours} ч {mins} мин" if mins else f"{hours} ч")
     else:
-        duration = f"{mins} мин"
+        duration = tr(language, f"{mins}m", f"{mins} мин")
 
-    return f"Сброс через {duration} - {target}"
+    return tr(language, f"Reset in {duration} - {target}", f"Сброс через {duration} - {target}")
 
 
 class BalanceParser:
@@ -568,6 +578,7 @@ class SettingsStore:
         "always_on_top": True,
         "show_burndown": True,
         "refresh_seconds": REFRESH_SECONDS,
+        "language": DEFAULT_LANGUAGE,
         "version": APP_VERSION,
     }
 
@@ -590,6 +601,7 @@ class SettingsStore:
 
         settings["always_on_top"] = bool(settings.get("always_on_top", True))
         settings["show_burndown"] = bool(settings.get("show_burndown", True))
+        settings["language"] = settings.get("language") if settings.get("language") in LANGUAGES else DEFAULT_LANGUAGE
 
         try:
             refresh_seconds = int(settings.get("refresh_seconds", REFRESH_SECONDS))
@@ -611,6 +623,7 @@ class SettingsStore:
 
         data["always_on_top"] = bool(data.get("always_on_top", True))
         data["show_burndown"] = bool(data.get("show_burndown", True))
+        data["language"] = data.get("language") if data.get("language") in LANGUAGES else DEFAULT_LANGUAGE
         try:
             data["refresh_seconds"] = max(60, min(3600, int(data.get("refresh_seconds", REFRESH_SECONDS))))
         except (TypeError, ValueError):
@@ -972,46 +985,46 @@ def hex_to_rgb(color: str) -> tuple[int, int, int]:
     return tuple(int(color[index:index + 2], 16) for index in (0, 2, 4))  # type: ignore[return-value]
 
 
-def format_tray_reset(reset_text: str | None) -> str:
+def format_tray_reset(reset_text: str | None, language: str = DEFAULT_LANGUAGE) -> str:
     reset_dt = parse_reset_datetime(reset_text)
     cleaned = normalize_reset_text(reset_text)
     if not cleaned:
-        return "сброс не найден"
+        return tr(language, "reset not found", "сброс не найден")
     if reset_dt is None:
         return cleaned.lower()
 
     remaining = reset_dt - datetime.now()
     total_seconds = int(remaining.total_seconds())
     if total_seconds <= 0:
-        return "сброс скоро"
+        return tr(language, "reset soon", "сброс скоро")
 
     minutes = max(1, total_seconds // 60)
     days, rest_minutes = divmod(minutes, 24 * 60)
     hours, mins = divmod(rest_minutes, 60)
     if days > 0:
-        duration = f"{days} д {hours} ч" if hours else f"{days} д"
+        duration = tr(language, f"{days}d {hours}h" if hours else f"{days}d", f"{days} д {hours} ч" if hours else f"{days} д")
     elif hours > 0:
-        duration = f"{hours} ч {mins} мин" if mins else f"{hours} ч"
+        duration = tr(language, f"{hours}h {mins}m" if mins else f"{hours}h", f"{hours} ч {mins} мин" if mins else f"{hours} ч")
     else:
-        duration = f"{mins} мин"
-    return f"сброс через {duration}"
+        duration = tr(language, f"{mins}m", f"{mins} мин")
+    return tr(language, f"reset in {duration}", f"сброс через {duration}")
 
 
-def build_tray_tooltip(balance: Balance, last_successful_update: datetime | None, status: str | None) -> str:
+def build_tray_tooltip(balance: Balance, last_successful_update: datetime | None, status: str | None, language: str = DEFAULT_LANGUAGE) -> str:
     five_hour = safe_int(balance.five_hour_percent)
     weekly = safe_int(balance.weekly_percent)
-    credits = balance.credits or "не найдено"
+    credits = balance.credits or tr(language, "not found", "не найдено")
 
-    five_text = f"{five_hour}%" if five_hour is not None else "не найдено"
-    weekly_text = f"{weekly}%" if weekly is not None else "не найдено"
-    updated_text = last_successful_update.strftime("%H:%M") if last_successful_update else "нет"
-    status_text = status or "нет статуса"
+    five_text = f"{five_hour}%" if five_hour is not None else tr(language, "not found", "не найдено")
+    weekly_text = f"{weekly}%" if weekly is not None else tr(language, "not found", "не найдено")
+    updated_text = last_successful_update.strftime("%H:%M") if last_successful_update else tr(language, "no", "нет")
+    status_text = status or tr(language, "no status", "нет статуса")
 
     tooltip = (
         "Codex balance\n"
-        f"5ч: {five_text}, {format_tray_reset(balance.five_hour_reset_text)}\n"
-        f"Нед: {weekly_text}, {format_tray_reset(balance.weekly_reset_text)}\n"
-        f"Кр: {credits} | Обн: {updated_text}\n"
+        f"{tr(language, '5h', '5ч')}: {five_text}, {format_tray_reset(balance.five_hour_reset_text, language)}\n"
+        f"{tr(language, 'Week', 'Нед')}: {weekly_text}, {format_tray_reset(balance.weekly_reset_text, language)}\n"
+        f"{tr(language, 'Cr', 'Кр')}: {credits} | {tr(language, 'Upd', 'Обн')}: {updated_text}\n"
         f"{status_text}"
     )
     if len(tooltip) > 120:
@@ -1022,7 +1035,7 @@ def build_tray_tooltip(balance: Balance, last_successful_update: datetime | None
 def load_tray_font(size: int):
     if ImageFont is None:
         return None
-    for font_name in ["seguisb.ttf", "segoeuib.ttf", "arialbd.ttf", "arial.ttf"]:
+    for font_name in ["seguibl.ttf", "segoeuib.ttf", "arialbd.ttf", "seguisb.ttf", "arial.ttf"]:
         try:
             return ImageFont.truetype(font_name, size)
         except Exception:
@@ -1041,10 +1054,14 @@ def create_tray_image(percent: int | None):
     bg_color = usage_color(percent) if percent is not None else MUTED
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((4, 4, size - 4, size - 4), radius=14, fill=hex_to_rgb(bg_color) + (255,))
+    draw.rounded_rectangle((2, 2, size - 2, size - 2), radius=14, fill=hex_to_rgb(bg_color) + (255,))
 
-    label = "?" if percent is None else str(max(0, min(100, percent)))
-    font_size_candidates = [28, 25, 22, 19, 16] if len(label) >= 3 else [32, 28, 24, 20]
+    if percent is None:
+        label = "?"
+    else:
+        percent = max(0, min(100, percent))
+        label = "✓" if percent == 100 else str(percent // 10)
+    font_size_candidates = [52, 49, 46, 43, 40, 37]
     font = None
     bbox = None
     for font_size in font_size_candidates:
@@ -1054,7 +1071,7 @@ def create_tray_image(percent: int | None):
         candidate_bbox = draw.textbbox((0, 0), label, font=candidate)
         text_w = candidate_bbox[2] - candidate_bbox[0]
         text_h = candidate_bbox[3] - candidate_bbox[1]
-        if text_w <= 52 and text_h <= 42:
+        if text_w <= 60 and text_h <= 52:
             font = candidate
             bbox = candidate_bbox
             break
@@ -1066,7 +1083,14 @@ def create_tray_image(percent: int | None):
     text_h = bbox[3] - bbox[1]
     x = (size - text_w) / 2 - bbox[0]
     y = (size - text_h) / 2 - bbox[1] - 1
-    draw.text((x, y), label, fill=(255, 255, 255, 255), font=font)
+    draw.text(
+        (x, y),
+        label,
+        fill=(255, 255, 255, 255),
+        font=font,
+        stroke_width=1,
+        stroke_fill=(255, 255, 255, 255),
+    )
     return image
 
 
@@ -1081,6 +1105,7 @@ class CodexBalanceWidget:
         self.always_on_top = bool(self.app_settings.get("always_on_top", True))
         self.show_burndown = bool(self.app_settings.get("show_burndown", True))
         self.refresh_seconds = int(self.app_settings.get("refresh_seconds", REFRESH_SECONDS))
+        self.language = str(self.app_settings.get("language", DEFAULT_LANGUAGE))
         self.last_successful_update: datetime | None = None
         self.last_fetch_status: str | None = None
         self.last_fetch_error: str | None = None
@@ -1101,14 +1126,14 @@ class CodexBalanceWidget:
         self._install_blank_icon()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        self.status_var = tk.StringVar(value="Запуск...")
-        self.five_hour_title_var = tk.StringVar(value="5 часов")
+        self.status_var = tk.StringVar(value=tr(self.language, "Starting...", "Запуск..."))
+        self.five_hour_title_var = tk.StringVar(value=tr(self.language, "5 hours", "5 часов"))
         self.five_hour_value_var = tk.StringVar(value="...%")
-        self.weekly_title_var = tk.StringVar(value="Неделя")
+        self.weekly_title_var = tk.StringVar(value=tr(self.language, "Week", "Неделя"))
         self.weekly_value_var = tk.StringVar(value="...%")
-        self.credits_var = tk.StringVar(value="Кредиты: ...")
-        self.five_hour_reset_var = tk.StringVar(value="Сброс: не найден")
-        self.weekly_reset_var = tk.StringVar(value="Сброс: не найден")
+        self.credits_var = tk.StringVar(value=tr(self.language, "Credits: ...", "Кредиты: ..."))
+        self.five_hour_reset_var = tk.StringVar(value=tr(self.language, "Reset: not found", "Сброс: не найден"))
+        self.weekly_reset_var = tk.StringVar(value=tr(self.language, "Reset: not found", "Сброс: не найден"))
         self.updated_var = tk.StringVar(value="")
 
         self.settings_icon_image: tk.PhotoImage | None = None
@@ -1123,7 +1148,9 @@ class CodexBalanceWidget:
 
     def _install_blank_icon(self) -> None:
         try:
-            blank = tk.PhotoImage(width=16, height=16)
+            # Windows renders a fully transparent Tk icon handle as a black square.
+            # A nearly transparent PNG keeps the title-bar slot visually empty.
+            blank = tk.PhotoImage(data=BLANK_WINDOW_ICON_PNG)
             self.root.iconphoto(True, blank)
             self._blank_icon = blank
         except tk.TclError:
@@ -1164,8 +1191,8 @@ class CodexBalanceWidget:
 
         buttons = tk.Frame(outer, bg=BG)
         buttons.pack(fill="x", pady=(2, 0))
-        self._flat_button(buttons, "Обновить", self.manual_refresh).pack(side="left")
-        self._flat_button(buttons, "Открыть сайт", self.open_usage_site).pack(side="left", padx=(8, 0))
+        self._flat_button(buttons, tr(self.language, "Refresh", "Обновить"), self.manual_refresh).pack(side="left")
+        self._flat_button(buttons, tr(self.language, "Open site", "Открыть сайт"), self.open_usage_site).pack(side="left", padx=(8, 0))
         self.tools_button = self._settings_button(buttons, self.show_tools_menu)
         self.tools_button.pack(side="right")
 
@@ -1278,12 +1305,12 @@ class CodexBalanceWidget:
             relief="flat",
             bd=1,
         )
-        menu.add_command(label="Настройки...", command=self.show_settings)
+        menu.add_command(label=tr(self.language, "Settings...", "Настройки..."), command=self.show_settings)
         menu.add_separator()
-        menu.add_command(label="Диагностика", command=self.show_diagnostics)
-        menu.add_command(label="Открыть лог", command=self.open_log_file)
+        menu.add_command(label=tr(self.language, "Diagnostics", "Диагностика"), command=self.show_diagnostics)
+        menu.add_command(label=tr(self.language, "Open log", "Открыть лог"), command=self.open_log_file)
         menu.add_separator()
-        menu.add_command(label="Помощь", command=self.show_help)
+        menu.add_command(label=tr(self.language, "Help", "Помощь"), command=self.show_help)
 
         try:
             x = self.tools_button.winfo_rootx()
@@ -1300,21 +1327,21 @@ class CodexBalanceWidget:
 
         try:
             menu = pystray.Menu(
-                pystray.MenuItem("Показать / скрыть окно", self._tray_toggle_window, default=True),
-                pystray.MenuItem("Обновить", self._tray_manual_refresh),
-                pystray.MenuItem("Открыть сайт", self._tray_open_usage_site),
+                pystray.MenuItem(tr(self.language, "Show / hide window", "Показать / скрыть окно"), self._tray_toggle_window, default=True),
+                pystray.MenuItem(tr(self.language, "Refresh", "Обновить"), self._tray_manual_refresh),
+                pystray.MenuItem(tr(self.language, "Open site", "Открыть сайт"), self._tray_open_usage_site),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Настройки...", self._tray_show_settings),
-                pystray.MenuItem("Диагностика", self._tray_show_diagnostics),
-                pystray.MenuItem("Открыть лог", self._tray_open_log_file),
+                pystray.MenuItem(tr(self.language, "Settings...", "Настройки..."), self._tray_show_settings),
+                pystray.MenuItem(tr(self.language, "Diagnostics", "Диагностика"), self._tray_show_diagnostics),
+                pystray.MenuItem(tr(self.language, "Open log", "Открыть лог"), self._tray_open_log_file),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Выход", self._tray_exit_app),
+                pystray.MenuItem(tr(self.language, "Exit", "Выход"), self._tray_exit_app),
             )
             icon_image = create_tray_image(safe_int(self.current_balance.five_hour_percent))
             self.tray_icon = pystray.Icon(
                 "codex_balance_widget",
                 icon_image,
-                build_tray_tooltip(self.current_balance, self.last_successful_update, self.status_var.get()),
+                build_tray_tooltip(self.current_balance, self.last_successful_update, self.status_var.get(), self.language),
                 menu,
             )
             self.tray_thread = threading.Thread(target=self.tray_icon.run, name="CodexBalanceTray", daemon=True)
@@ -1338,6 +1365,7 @@ class CodexBalanceWidget:
                 self.current_balance,
                 self.last_successful_update,
                 self.status_var.get(),
+                self.language,
             )
         except Exception as exc:
             write_log(f"Could not update tray icon: {type(exc).__name__}: {exc}")
@@ -1419,11 +1447,11 @@ class CodexBalanceWidget:
             self.current_balance = balance
             five_hour_percent = safe_int(balance.five_hour_percent)
             weekly_percent = safe_int(balance.weekly_percent)
-            credits = balance.credits or "не найдено"
+            credits = balance.credits or tr(self.language, "not found", "не найдено")
 
-            self.five_hour_value_var.set(f"{five_hour_percent}%" if five_hour_percent is not None else "не найдено")
-            self.weekly_value_var.set(f"{weekly_percent}%" if weekly_percent is not None else "не найдено")
-            self.credits_var.set(f"Кредиты: {credits}")
+            self.five_hour_value_var.set(f"{five_hour_percent}%" if five_hour_percent is not None else tr(self.language, "not found", "не найдено"))
+            self.weekly_value_var.set(f"{weekly_percent}%" if weekly_percent is not None else tr(self.language, "not found", "не найдено"))
+            self.credits_var.set(tr(self.language, f"Credits: {credits}", f"Кредиты: {credits}"))
 
             self.five_hour_card["value_label"].configure(fg=usage_color(five_hour_percent))
             self.weekly_card["value_label"].configure(fg=usage_color(weekly_percent))
@@ -1433,7 +1461,7 @@ class CodexBalanceWidget:
             self.history = HistoryStore.append_balance(balance)
             self.update_countdowns(schedule_next=False)
             self.update_weekly_chart()
-            self.updated_var.set("Обновлено: " + datetime.now().strftime("%H:%M:%S"))
+            self.updated_var.set(tr(self.language, "Updated: ", "Обновлено: ") + datetime.now().strftime("%H:%M:%S"))
             self.update_tray_icon()
 
             write_log(
@@ -1475,8 +1503,8 @@ class CodexBalanceWidget:
     def update_countdowns(self, *, schedule_next: bool = True) -> None:
         five_hour_dt = parse_reset_datetime(self.current_balance.five_hour_reset_text)
         weekly_dt = parse_reset_datetime(self.current_balance.weekly_reset_text)
-        self.five_hour_reset_var.set(format_countdown(five_hour_dt, self.current_balance.five_hour_reset_text))
-        self.weekly_reset_var.set(format_countdown(weekly_dt, self.current_balance.weekly_reset_text))
+        self.five_hour_reset_var.set(format_countdown(five_hour_dt, self.current_balance.five_hour_reset_text, self.language))
+        self.weekly_reset_var.set(format_countdown(weekly_dt, self.current_balance.weekly_reset_text, self.language))
         self.update_weekly_chart()
         self.update_tray_icon()
         if schedule_next:
@@ -1487,7 +1515,7 @@ class CodexBalanceWidget:
 
     def manual_refresh(self) -> None:
         if self.refresh_in_progress:
-            self.set_status("Обновление уже идет...")
+            self.set_status(tr(self.language, "Refresh already in progress...", "Обновление уже идет..."))
             return
         asyncio.run_coroutine_threadsafe(self.fetch_once(), self.loop)
 
@@ -1502,17 +1530,17 @@ class CodexBalanceWidget:
                 os.startfile(str(LOG_PATH))  # type: ignore[attr-defined]
             else:
                 webbrowser.open(LOG_PATH.resolve().as_uri(), new=2)
-            self.set_status("Открыл лог")
+            self.set_status(tr(self.language, "Opened log", "Открыл лог"))
         except OSError as exc:
-            self.set_status("Не удалось открыть лог")
-            messagebox.showerror("Лог", f"Не удалось открыть лог:\n{exc}")
+            self.set_status(tr(self.language, "Could not open log", "Не удалось открыть лог"))
+            messagebox.showerror(tr(self.language, "Log", "Лог"), tr(self.language, f"Could not open log:\n{exc}", f"Не удалось открыть лог:\n{exc}"))
 
     def show_settings(self) -> None:
         window = tk.Toplevel(self.root)
-        window.title("Настройки")
+        window.title(tr(self.language, "Settings", "Настройки"))
         window.configure(bg=BG)
-        window.geometry("380x245")
-        window.minsize(340, 230)
+        window.geometry("400x310")
+        window.minsize(360, 290)
         window.transient(self.root)
         window.grab_set()
 
@@ -1521,7 +1549,7 @@ class CodexBalanceWidget:
 
         tk.Label(
             container,
-            text="Настройки виджета",
+            text=tr(self.language, "Widget settings", "Настройки виджета"),
             font=("Segoe UI", 13, "bold"),
             bg=BG,
             fg=TEXT,
@@ -1530,6 +1558,7 @@ class CodexBalanceWidget:
         always_var = tk.BooleanVar(value=self.always_on_top)
         burndown_var = tk.BooleanVar(value=self.show_burndown)
         minutes_var = tk.StringVar(value=str(max(1, int(round(self.refresh_seconds / 60)))))
+        language_var = tk.StringVar(value=self.language)
 
         def make_check(text: str, variable: tk.BooleanVar) -> tk.Checkbutton:
             return tk.Checkbutton(
@@ -1545,12 +1574,18 @@ class CodexBalanceWidget:
                 anchor="w",
             )
 
-        make_check("Поверх окон", always_var).pack(fill="x", pady=(0, 6))
-        make_check("Показывать недельный burndown", burndown_var).pack(fill="x", pady=(0, 12))
+        make_check(tr(self.language, "Always on top", "Поверх окон"), always_var).pack(fill="x", pady=(0, 6))
+        make_check(tr(self.language, "Show weekly burndown", "Показывать недельный burndown"), burndown_var).pack(fill="x", pady=(0, 12))
+
+        language_row = tk.Frame(container, bg=BG)
+        language_row.pack(fill="x", pady=(0, 10))
+        tk.Label(language_row, text=tr(self.language, "Language:", "Язык:"), font=("Segoe UI", 10), bg=BG, fg=TEXT).pack(side="left")
+        tk.Radiobutton(language_row, text="English", variable=language_var, value="en", bg=BG, fg=TEXT, selectcolor=BG).pack(side="left", padx=(8, 0))
+        tk.Radiobutton(language_row, text="Русский", variable=language_var, value="ru", bg=BG, fg=TEXT, selectcolor=BG).pack(side="left", padx=(8, 0))
 
         interval_row = tk.Frame(container, bg=BG)
         interval_row.pack(fill="x", pady=(0, 4))
-        tk.Label(interval_row, text="Интервал обновления:", font=("Segoe UI", 10), bg=BG, fg=TEXT).pack(side="left")
+        tk.Label(interval_row, text=tr(self.language, "Refresh interval:", "Интервал обновления:"), font=("Segoe UI", 10), bg=BG, fg=TEXT).pack(side="left")
         spin = tk.Spinbox(
             interval_row,
             from_=1,
@@ -1564,11 +1599,11 @@ class CodexBalanceWidget:
             highlightcolor=BORDER,
         )
         spin.pack(side="left", padx=(8, 4))
-        tk.Label(interval_row, text="мин", font=("Segoe UI", 10), bg=BG, fg=TEXT).pack(side="left")
+        tk.Label(interval_row, text=tr(self.language, "min", "мин"), font=("Segoe UI", 10), bg=BG, fg=TEXT).pack(side="left")
 
         tk.Label(
             container,
-            text="Новый интервал применится для следующих автообновлений.",
+            text=tr(self.language, "Changes apply after restart. The interval is used for future refreshes.", "Изменения языка применятся после перезапуска. Интервал — для следующих автообновлений."),
             font=("Segoe UI", 8),
             bg=BG,
             fg=MUTED,
@@ -1581,13 +1616,14 @@ class CodexBalanceWidget:
             try:
                 minutes = int(str(minutes_var.get()).strip())
             except ValueError:
-                messagebox.showerror("Настройки", "Интервал обновления должен быть числом минут.", parent=window)
+                messagebox.showerror(tr(self.language, "Settings", "Настройки"), tr(self.language, "Refresh interval must be a number of minutes.", "Интервал обновления должен быть числом минут."), parent=window)
                 return
             minutes = max(1, min(60, minutes))
 
             self.always_on_top = bool(always_var.get())
             self.show_burndown = bool(burndown_var.get())
             self.refresh_seconds = minutes * 60
+            selected_language = language_var.get() if language_var.get() in LANGUAGES else DEFAULT_LANGUAGE
             self.root.attributes("-topmost", self.always_on_top)
 
             self.app_settings = SettingsStore.load()
@@ -1596,14 +1632,15 @@ class CodexBalanceWidget:
                 "always_on_top": self.always_on_top,
                 "show_burndown": self.show_burndown,
                 "refresh_seconds": self.refresh_seconds,
+                "language": selected_language,
             })
             SettingsStore.save(self.app_settings)
             self.update_weekly_chart()
-            self.set_status("Настройки сохранены")
+            self.set_status(tr(self.language, "Settings saved. Restart to apply language changes.", "Настройки сохранены. Перезапустите приложение для смены языка."))
             window.destroy()
 
-        self._flat_button(button_row, "Сохранить", save_settings).pack(side="left")
-        self._flat_button(button_row, "Отмена", window.destroy).pack(side="left", padx=(8, 0))
+        self._flat_button(button_row, tr(self.language, "Save", "Сохранить"), save_settings).pack(side="left")
+        self._flat_button(button_row, tr(self.language, "Cancel", "Отмена"), window.destroy).pack(side="left", padx=(8, 0))
 
     def show_diagnostics(self) -> None:
         window = tk.Toplevel(self.root)
@@ -1765,15 +1802,15 @@ class CodexBalanceWidget:
 
     async def fetch_once(self) -> None:
         if self.refresh_in_progress:
-            self.set_status("Обновление уже идет...")
+            self.set_status(tr(self.language, "Refresh already in progress...", "Обновление уже идет..."))
             return
 
         self.refresh_in_progress = True
         try:
             if not self.browser:
                 self.last_fetch_status = "chrome_not_found"
-                self.last_fetch_error = "Google Chrome не найден"
-                self.set_status("Google Chrome не найден. Укажите CHROME_PATH.")
+                self.last_fetch_error = tr(self.language, "Google Chrome not found", "Google Chrome не найден")
+                self.set_status(tr(self.language, "Google Chrome not found. Set CHROME_PATH.", "Google Chrome не найден. Укажите CHROME_PATH."))
                 return
 
             result = await self.browser.fetch()
@@ -1782,18 +1819,22 @@ class CodexBalanceWidget:
             self.last_usage_text_length = len(result.text) if result.text else None
             if result.status != "ok" or not result.text:
                 if result.status == "browser_error":
-                    self.set_status("Chrome не запустился. Подробности в widget_launch.log")
+                    self.set_status(tr(self.language, "Chrome failed to start. See widget_launch.log", "Chrome не запустился. Подробности в widget_launch.log"))
                 elif result.status == "login_required":
-                    self.set_status("Нужен вход в ChatGPT. Нажмите Обновить, чтобы открыть Chrome.")
+                    self.set_status(tr(self.language, "Sign in to ChatGPT. Click Refresh to open Chrome.", "Нужен вход в ChatGPT. Нажмите Обновить, чтобы открыть Chrome."))
                 else:
-                    self.set_status("Не дождался данных Usage. Нажмите Обновить.")
+                    self.set_status(tr(self.language, "Usage data timed out. Click Refresh.", "Не дождался данных Usage. Нажмите Обновить."))
                 return
 
             balance = BalanceParser.parse(result.text)
             if balance.has_usage_data:
                 self.last_successful_update = datetime.now()
             self.update_balance_ui(balance)
-            self.set_status("Данные актуальны" if balance.has_usage_data else "Данные не распознаны")
+            self.set_status(
+                tr(self.language, "Data is up to date", "Данные актуальны")
+                if balance.has_usage_data
+                else tr(self.language, "Data not recognized", "Данные не распознаны")
+            )
         finally:
             self.refresh_in_progress = False
 

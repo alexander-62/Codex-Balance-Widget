@@ -1,104 +1,106 @@
 # Codex Balance Widget
 
-Небольшой Windows-виджет для просмотра лимитов Codex Usage. Виджет открывает страницу
-`https://chatgpt.com/codex/cloud/settings/analytics#usage` через установленный Google
-Chrome, считывает видимый текст и показывает остаток лимита в отдельном окне.
+[Русский](README.ru.md)
 
-## Требования
+A small Windows widget for monitoring Codex Usage limits. It opens
+`https://chatgpt.com/codex/cloud/settings/analytics#usage` in your installed
+Google Chrome and displays the remaining quota in a compact window and the
+system tray.
+
+## Features
+
+- 5-hour and weekly limits, reset times, and credits
+- color-coded tray icon with a large tens digit
+- tooltip with exact values
+- local weekly usage burndown chart
+- configurable refresh interval, always-on-top mode, and interface language
+- separate Chrome profile: your primary browser profile is not used
+
+## Requirements
 
 - Windows
-- Python 3.10 или новее
+- Python 3.10 or newer with Windows Python Launcher
 - Google Chrome
-- доступ к странице Codex Usage в аккаунте ChatGPT
+- access to the Codex Usage page in your ChatGPT account
 
-## Установка
+## Install and Run
 
-1. Запустите:
+1. Run `install.bat`.
+2. Run `run.bat`.
+3. On the first launch, sign in to ChatGPT in the Chrome window that opens.
 
-   ```bat
-   install.bat
-   ```
+The app uses your system Google Chrome. It does not download Playwright
+Chromium.
 
-2. Дождитесь установки Python-библиотеки Playwright.
-
-Скачивать отдельный Playwright Chromium не нужно: приложение использует системный
-Google Chrome.
-
-## Запуск
-
-Запустите:
+For debugging, run:
 
 ```bat
-run.bat
+py -3 codex_balance_widget_chrome.py
 ```
 
-`run.bat` вызывает `run_hidden.vbs`, а тот запускает приложение без лишнего окна
-консоли. При первом старте откроется Chrome: войдите в ChatGPT вручную и закройте
-окно после успешной авторизации. Последующие обновления выполняются в фоне.
+## System Tray
 
-Для отладки можно запустить основной файл напрямую:
+The tray icon background reflects the remaining 5-hour limit:
 
-```bat
-python codex_balance_widget_chrome.py
-```
+- green: `51–100%`
+- orange: `21–50%`
+- red: `0–20%`
+- gray with `?`: data has not been loaded yet
 
-## Локальный профиль Chrome
+The icon shows a large tens digit: for example, `87%` is displayed as `8`.
+`100%` is displayed as `✓`. Hover over the icon to see exact values, reset
+times, credits, the last update time, and the current status.
 
-Приложение не использует основной профиль Chrome. Оно создаёт отдельную локальную
-папку:
+Right-click the icon to show or hide the window, refresh data, open the Codex
+Usage page, access settings and diagnostics, open the log, or exit.
+
+Closing the window with the title-bar button hides it in the tray. Use `Exit`
+from the tray menu to stop the app.
+
+## Local Data and Privacy
+
+The app creates a separate local Chrome profile:
 
 ```text
 codex_chrome_profile
 ```
 
-В ней хранится отдельная сессия ChatGPT для виджета. Папка исключена из Git через
-`.gitignore`: не публикуйте её и не передавайте другим людям.
+This profile stores a dedicated ChatGPT session for the widget. The profile,
+settings, usage history, lock file, logs, and diagnostic snapshots are excluded
+from Git through `.gitignore`. Do not publish or share the profile directory.
 
-## Настройки
+## Settings
 
-Через кнопку настроек в окне виджета можно изменить:
+The settings window lets you change:
 
-- положение и размер окна
-- режим отображения поверх других окон
-- отображение графика расхода лимита
-- частоту обновления
+- interface language: English or Русский
+- always-on-top mode
+- weekly burndown visibility
+- refresh interval
 
-Настройки сохраняются локально в `codex_balance_widget_settings.json`. История для
-графика хранится в `codex_balance_history.json`. Оба файла исключены из Git.
+English is the default language. Restart the app after changing the language.
 
-Частота обновления по умолчанию задаётся в `codex_balance_widget_chrome.py`:
+## Chrome Path
 
-```python
-REFRESH_SECONDS = 300
-```
-
-## Если Chrome не найден
-
-Укажите путь через переменную окружения `CHROME_PATH`.
-
-Пример для текущего окна CMD:
+If Chrome is not detected automatically, set `CHROME_PATH`:
 
 ```bat
 set CHROME_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
-python codex_balance_widget_chrome.py
+py -3 codex_balance_widget_chrome.py
 ```
 
-Обычно Chrome установлен в одной из папок:
+## Diagnostics
 
-```text
-C:\Program Files\Google\Chrome\Application\chrome.exe
-C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
-```
+Use the settings menu or tray menu to open diagnostics and `widget_launch.log`.
+If hidden startup cannot find Python, make sure Windows Python Launcher is
+installed: `run_hidden.vbs` uses `pyw.exe -3`.
 
-## Диагностика
+## Disclaimer
 
-Если виджет не запускается, проверьте файл `widget_launch.log`. Он создаётся рядом
-со скриптами и исключён из Git.
+This is an unofficial community tool and is not affiliated with OpenAI. It
+reads visible text from the Codex Usage page. If the page layout changes, the
+parser may need an update.
 
-Если скрытый запуск не находит Python, проверьте путь `pythonwPath` в
-`run_hidden.vbs`. В скрипте есть запасной запуск через `pyw.exe -3`.
+## License
 
-## Ограничения
-
-Это не официальный API. Виджет читает видимый текст страницы Codex Usage. Если
-интерфейс страницы изменится, может потребоваться обновить функцию `parse_balance()`.
+[MIT License](LICENSE)
