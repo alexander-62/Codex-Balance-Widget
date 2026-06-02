@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+
+# Local editor and OS files
+.idea/
+.vscode/
+Thumbs.db
+Desktop.ini
+
+# Widget runtime state
+codex_chrome_profile/
+codex_balance_history.json
+codex_balance_widget.lock
+codex_balance_widget_settings.json
+widget_launch.log
+
+# Local diagnostic snapshots
+Codex*.mhtml
