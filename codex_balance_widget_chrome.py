@@ -247,13 +247,20 @@ def safe_int(value: str | None) -> int | None:
     return max(0, min(100, parsed))
 
 
-def usage_color(percent: int | None) -> str:
+USAGE_COLOR_POLICY: tuple[tuple[int, str], ...] = (
+    (20, RED),
+    (50, ORANGE),
+    (100, GREEN),
+)
+
+
+def usage_color(percent: int | float | None) -> str:
+    """Single color scale for tray, percent labels, progress bars, and burndown."""
     if percent is None:
         return MUTED
-    if percent <= 20:
-        return RED
-    if percent <= 50:
-        return ORANGE
+    for upper_bound, color in USAGE_COLOR_POLICY:
+        if percent <= upper_bound:
+            return color
     return GREEN
 
 
@@ -691,6 +698,7 @@ class HistoryStore:
             "timestamp": now.isoformat(timespec="seconds"),
             "weekly_percent": weekly_percent,
             "five_hour_percent": five_hour_percent,
+            "credits": balance.credits,
             "weekly_reset_text": normalize_reset_text(balance.weekly_reset_text),
             "weekly_reset_datetime": weekly_reset_dt.isoformat(timespec="seconds") if weekly_reset_dt else None,
             "five_hour_reset_text": normalize_reset_text(balance.five_hour_reset_text),
@@ -715,6 +723,24 @@ class HistoryStore:
         kept.append(new_item)
         HistoryStore.save(kept)
         return kept
+
+    @staticmethod
+    def latest_balance() -> tuple[Balance, datetime | None] | None:
+        for item in reversed(HistoryStore.load()):
+            five_hour_percent = safe_int(item.get("five_hour_percent"))
+            weekly_percent = safe_int(item.get("weekly_percent"))
+            if five_hour_percent is None and weekly_percent is None and not item.get("credits"):
+                continue
+            timestamp = parse_iso_datetime(item.get("timestamp"))
+            balance = Balance(
+                five_hour_percent=str(five_hour_percent) if five_hour_percent is not None else None,
+                weekly_percent=str(weekly_percent) if weekly_percent is not None else None,
+                credits=str(item.get("credits")) if item.get("credits") is not None else None,
+                five_hour_reset_text=item.get("five_hour_reset_text") if isinstance(item.get("five_hour_reset_text"), str) else None,
+                weekly_reset_text=item.get("weekly_reset_text") if isinstance(item.get("weekly_reset_text"), str) else None,
+            )
+            return balance, timestamp
+        return None
 
 
 def parse_iso_datetime(value: object) -> datetime | None:
@@ -881,7 +907,6 @@ class WeeklyBurndownCanvas(tk.Canvas):
         self.points: list[dict] = []
         self.week_start: datetime | None = None
         self.week_end: datetime | None = None
-        self.line_color = GREEN
         self.bind("<Configure>", lambda _event: self.redraw())
 
     def set_data(
@@ -921,9 +946,55 @@ class WeeklyBurndownCanvas(tk.Canvas):
 
         filtered.sort(key=lambda item: item["timestamp"])
         self.points = filtered
-        self.line_color = usage_color(weekly_percent)
         self.redraw()
         return len(filtered) >= 2
+
+    @staticmethod
+    def _interpolate_point(
+        start: tuple[float, float, int],
+        end: tuple[float, float, int],
+        value: float,
+    ) -> tuple[float, float, float]:
+        start_x, start_y, start_value = start
+        end_x, end_y, end_value = end
+        if end_value == start_value:
+            return start_x, start_y, float(start_value)
+        ratio = (value - start_value) / (end_value - start_value)
+        x = start_x + (end_x - start_x) * ratio
+        y = start_y + (end_y - start_y) * ratio
+        return x, y, value
+
+    def _draw_colored_segment(
+        self,
+        start: tuple[float, float, int],
+        end: tuple[float, float, int],
+    ) -> None:
+        start_value = start[2]
+        end_value = end[2]
+        thresholds = [upper_bound for upper_bound, _color in USAGE_COLOR_POLICY[:-1]]
+        crossed = [
+            threshold
+            for threshold in thresholds
+            if min(start_value, end_value) < threshold < max(start_value, end_value)
+        ]
+        crossed.sort(reverse=start_value > end_value)
+
+        points: list[tuple[float, float, float]] = [
+            (start[0], start[1], float(start_value)),
+            *(self._interpolate_point(start, end, threshold) for threshold in crossed),
+            (end[0], end[1], float(end_value)),
+        ]
+
+        for first, second in zip(points, points[1:]):
+            average_value = (first[2] + second[2]) / 2
+            self.create_line(
+                first[0],
+                first[1],
+                second[0],
+                second[1],
+                fill=usage_color(average_value),
+                width=2,
+            )
 
     def redraw(self) -> None:
         self.delete("all")
@@ -971,13 +1042,18 @@ class WeeklyBurndownCanvas(tk.Canvas):
         for segment in segments:
             if len(segment) < 2:
                 continue
-            flat_coords: list[float] = []
-            for x, y, _value in segment:
-                flat_coords.extend([x, y])
-            self.create_line(*flat_coords, fill=self.line_color, width=2, smooth=True)
+            for start, end in zip(segment, segment[1:]):
+                self._draw_colored_segment(start, end)
 
-        last_x, last_y, _last_value = coords[-1]
-        self.create_oval(last_x - 2.5, last_y - 2.5, last_x + 2.5, last_y + 2.5, fill=self.line_color, outline="")
+        last_x, last_y, last_value = coords[-1]
+        self.create_oval(
+            last_x - 2.5,
+            last_y - 2.5,
+            last_x + 2.5,
+            last_y + 2.5,
+            fill=usage_color(last_value),
+            outline="",
+        )
 
 
 def hex_to_rgb(color: str) -> tuple[int, int, int]:
@@ -1138,6 +1214,7 @@ class CodexBalanceWidget:
 
         self.settings_icon_image: tk.PhotoImage | None = None
         self._build_ui()
+        self.restore_latest_history()
 
         self.loop = asyncio.new_event_loop()
         self.worker = threading.Thread(target=self._run_loop, daemon=True)
@@ -1442,28 +1519,54 @@ class CodexBalanceWidget:
         if hasattr(self, "root"):
             self.root.after(0, apply)
 
+    def restore_latest_history(self) -> None:
+        latest = HistoryStore.latest_balance()
+        if latest is None:
+            return
+        balance, timestamp = latest
+        self.last_successful_update = timestamp
+        self.apply_balance_ui(balance, append_history=False, updated_at=timestamp, from_history=True)
+        self.set_status(tr(self.language, "Last saved data · updating...", "Данные из истории · обновление..."))
+
+    def apply_balance_ui(
+        self,
+        balance: Balance,
+        *,
+        append_history: bool,
+        updated_at: datetime | None = None,
+        from_history: bool = False,
+    ) -> None:
+        self.current_balance = balance
+        five_hour_percent = safe_int(balance.five_hour_percent)
+        weekly_percent = safe_int(balance.weekly_percent)
+        credits = balance.credits or tr(self.language, "not found", "не найдено")
+
+        self.five_hour_value_var.set(f"{five_hour_percent}%" if five_hour_percent is not None else tr(self.language, "not found", "не найдено"))
+        self.weekly_value_var.set(f"{weekly_percent}%" if weekly_percent is not None else tr(self.language, "not found", "не найдено"))
+        self.credits_var.set(tr(self.language, f"Credits: {credits}", f"Кредиты: {credits}"))
+
+        self.five_hour_card["value_label"].configure(fg=usage_color(five_hour_percent))
+        self.weekly_card["value_label"].configure(fg=usage_color(weekly_percent))
+        self.five_hour_progress.set_value(five_hour_percent)
+        self.weekly_progress.set_value(weekly_percent)
+
+        if append_history:
+            self.history = HistoryStore.append_balance(balance)
+        self.update_countdowns(schedule_next=False)
+        self.update_weekly_chart()
+
+        if from_history:
+            prefix = tr(self.language, "From history: ", "Из истории: ")
+            stamp = updated_at.strftime("%H:%M:%S") if updated_at else tr(self.language, "time unknown", "время неизвестно")
+        else:
+            prefix = tr(self.language, "Updated: ", "Обновлено: ")
+            stamp = (updated_at or datetime.now()).strftime("%H:%M:%S")
+        self.updated_var.set(prefix + stamp)
+        self.update_tray_icon()
+
     def update_balance_ui(self, balance: Balance) -> None:
         def apply() -> None:
-            self.current_balance = balance
-            five_hour_percent = safe_int(balance.five_hour_percent)
-            weekly_percent = safe_int(balance.weekly_percent)
-            credits = balance.credits or tr(self.language, "not found", "не найдено")
-
-            self.five_hour_value_var.set(f"{five_hour_percent}%" if five_hour_percent is not None else tr(self.language, "not found", "не найдено"))
-            self.weekly_value_var.set(f"{weekly_percent}%" if weekly_percent is not None else tr(self.language, "not found", "не найдено"))
-            self.credits_var.set(tr(self.language, f"Credits: {credits}", f"Кредиты: {credits}"))
-
-            self.five_hour_card["value_label"].configure(fg=usage_color(five_hour_percent))
-            self.weekly_card["value_label"].configure(fg=usage_color(weekly_percent))
-            self.five_hour_progress.set_value(five_hour_percent)
-            self.weekly_progress.set_value(weekly_percent)
-
-            self.history = HistoryStore.append_balance(balance)
-            self.update_countdowns(schedule_next=False)
-            self.update_weekly_chart()
-            self.updated_var.set(tr(self.language, "Updated: ", "Обновлено: ") + datetime.now().strftime("%H:%M:%S"))
-            self.update_tray_icon()
-
+            self.apply_balance_ui(balance, append_history=True, updated_at=datetime.now())
             write_log(
                 "Parsed balance: "
                 f"5h={balance.five_hour_percent!r}, 5h_reset={balance.five_hour_reset_text!r}, "
@@ -1818,7 +1921,9 @@ class CodexBalanceWidget:
             self.last_fetch_error = result.error
             self.last_usage_text_length = len(result.text) if result.text else None
             if result.status != "ok" or not result.text:
-                if result.status == "browser_error":
+                if self.current_balance.has_usage_data:
+                    self.set_status(tr(self.language, "Showing last saved data · refresh failed", "Показаны последние данные · обновить не удалось"))
+                elif result.status == "browser_error":
                     self.set_status(tr(self.language, "Chrome failed to start. See widget_launch.log", "Chrome не запустился. Подробности в widget_launch.log"))
                 elif result.status == "login_required":
                     self.set_status(tr(self.language, "Sign in to ChatGPT. Click Refresh to open Chrome.", "Нужен вход в ChatGPT. Нажмите Обновить, чтобы открыть Chrome."))
@@ -1829,12 +1934,12 @@ class CodexBalanceWidget:
             balance = BalanceParser.parse(result.text)
             if balance.has_usage_data:
                 self.last_successful_update = datetime.now()
-            self.update_balance_ui(balance)
-            self.set_status(
-                tr(self.language, "Data is up to date", "Данные актуальны")
-                if balance.has_usage_data
-                else tr(self.language, "Data not recognized", "Данные не распознаны")
-            )
+                self.update_balance_ui(balance)
+                self.set_status(tr(self.language, "Data is up to date", "Данные актуальны"))
+            elif self.current_balance.has_usage_data:
+                self.set_status(tr(self.language, "Showing last saved data · new data not recognized", "Показаны последние данные · новые не распознаны"))
+            else:
+                self.set_status(tr(self.language, "Data not recognized", "Данные не распознаны"))
         finally:
             self.refresh_in_progress = False
 

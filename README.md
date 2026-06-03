@@ -47,6 +47,9 @@ The tray icon background reflects the remaining 5-hour limit:
 - red: `0–20%`
 - gray with `?`: data has not been loaded yet
 
+The same color scale is used everywhere remaining percentages are shown:
+tray icon, numeric values, progress bars, and weekly burndown segments.
+
 The icon shows a large tens digit: for example, `87%` is displayed as `8`.
 `100%` is displayed as `✓`. Hover over the icon to see exact values, reset
 times, credits, the last update time, and the current status.
