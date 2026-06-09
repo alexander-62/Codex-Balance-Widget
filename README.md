@@ -29,6 +29,11 @@ system tray.
 2. Run `run.bat`.
 3. On the first launch, sign in to ChatGPT in the Chrome window that opens.
 
+After a successful sign-in, normal refreshes reuse the dedicated profile in
+fully headless Chrome, so no browser window appears. Visible Chrome is opened
+again only when the ChatGPT session needs a new sign-in or when you manually
+click `Refresh` after a background refresh error to inspect the page.
+
 The app uses your system Google Chrome. It does not download Playwright
 Chromium.
 
