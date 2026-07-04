@@ -18,6 +18,7 @@ import json
 import msvcrt
 import os
 import re
+import shutil
 import threading
 import tkinter as tk
 import traceback
@@ -54,6 +55,22 @@ APP_LOCK_PATH = APP_DIR / "codex_balance_widget.lock"
 SETTINGS_PATH = APP_DIR / "codex_balance_widget_settings.json"
 HISTORY_PATH = APP_DIR / "codex_balance_history.json"
 SETTINGS_ICON_PATH = APP_DIR / "settings_icon.png"
+CHROME_CACHE_LIMIT_BYTES = 10 * 1024 * 1024
+CHROME_MEDIA_CACHE_LIMIT_BYTES = 1024 * 1024
+PROFILE_CACHE_DIRS = [
+    ("BrowserMetrics",),
+    ("GrShaderCache",),
+    ("ShaderCache",),
+    ("GraphiteDawnCache",),
+    ("GPUPersistentCache",),
+    ("Default", "Cache"),
+    ("Default", "Code Cache"),
+    ("Default", "GPUCache"),
+    ("Default", "DawnWebGPUCache"),
+    ("Default", "DawnGraphiteCache"),
+    ("Default", "ShaderCache"),
+    ("Default", "Service Worker", "CacheStorage"),
+]
 BLANK_WINDOW_ICON_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAJUlEQVR4nGP8//8/IwMFgIkSzaMGQAATA4WAadQAhtEwYKA8DABnpgMeG0xQggAAAABJRU5ErkJggg=="
 )
@@ -235,6 +252,36 @@ def has_saved_chrome_session() -> bool:
             default_dir / "Network" / "Cookies",
         ]
     )
+
+
+def prune_chrome_profile_cache() -> None:
+    """Remove Chrome cache folders without touching cookies or login storage."""
+    if not PROFILE_DIR.exists():
+        return
+
+    profile_root = PROFILE_DIR.resolve()
+    removed = 0
+    for parts in PROFILE_CACHE_DIRS:
+        path = PROFILE_DIR.joinpath(*parts)
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+
+        if not resolved.is_relative_to(profile_root) or not path.exists():
+            continue
+
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+            removed += 1
+        except OSError as exc:
+            write_log(f"Could not prune Chrome cache {path}: {type(exc).__name__}: {exc}")
+
+    if removed:
+        write_log(f"Pruned {removed} Chrome profile cache folder(s)")
 
 
 def safe_int(value: str | None) -> int | None:
@@ -773,8 +820,13 @@ class CodexUsageBrowser:
 
     async def _fetch_once(self, *, visible: bool, wait_for_login: bool) -> FetchResult:
         try:
+            prune_chrome_profile_cache()
             async with async_playwright() as playwright:
-                launch_args = ["--disable-blink-features=AutomationControlled"]
+                launch_args = [
+                    "--disable-blink-features=AutomationControlled",
+                    f"--disk-cache-size={CHROME_CACHE_LIMIT_BYTES}",
+                    f"--media-cache-size={CHROME_MEDIA_CACHE_LIMIT_BYTES}",
+                ]
                 if not visible:
                     launch_args.extend([
                         "--window-position=-32000,-32000",

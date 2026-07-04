@@ -71,6 +71,10 @@ codex_chrome_profile
 This profile stores a dedicated ChatGPT session for the widget. The profile,
 settings, usage history, lock file, logs, and diagnostic snapshots are excluded
 from Git through `.gitignore`. Do not publish or share the profile directory.
+Before each browser refresh, the widget prunes Chrome cache folders inside this
+profile and launches Chrome with small disk/media cache limits. Cookies and
+login storage are left intact, so the ChatGPT session should survive while the
+profile stays smaller.
 
 ## Settings
 
