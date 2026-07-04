@@ -5,7 +5,7 @@ Windows mini widget for Codex Usage limits.
 
 How it works:
 - Uses a separate local Chrome profile in ./codex_chrome_profile.
-- Refreshes in fully headless Chrome when an authenticated profile is already present.
+- Refreshes in hidden Chrome when an authenticated profile is already present.
 - Opens visible Chrome only when manual login is needed.
 - Never asks for credentials inside the widget.
 """
@@ -14,9 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import atexit
-import ctypes
-from ctypes import wintypes
-import hashlib
 import json
 import msvcrt
 import os
@@ -57,10 +54,6 @@ APP_LOCK_PATH = APP_DIR / "codex_balance_widget.lock"
 SETTINGS_PATH = APP_DIR / "codex_balance_widget_settings.json"
 HISTORY_PATH = APP_DIR / "codex_balance_history.json"
 SETTINGS_ICON_PATH = APP_DIR / "settings_icon.png"
-APP_ACTIVATE_EVENT_NAME = (
-    "Local\\CodexBalanceWidgetActivate-"
-    + hashlib.sha1(str(APP_DIR).lower().encode("utf-8")).hexdigest()[:16]
-)
 BLANK_WINDOW_ICON_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAJUlEQVR4nGP8//8/IwMFgIkSzaMGQAATA4WAadQAhtEwYKA8DABnpgMeG0xQggAAAABJRU5ErkJggg=="
 )
@@ -90,26 +83,6 @@ GRID = "#EEF2F7"
 
 DEFAULT_LANGUAGE = "en"
 LANGUAGES = {"en", "ru"}
-
-if os.name == "nt":
-    _KERNEL32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    _KERNEL32.CreateEventW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
-    _KERNEL32.CreateEventW.restype = wintypes.HANDLE
-    _KERNEL32.OpenEventW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
-    _KERNEL32.OpenEventW.restype = wintypes.HANDLE
-    _KERNEL32.SetEvent.argtypes = [wintypes.HANDLE]
-    _KERNEL32.SetEvent.restype = wintypes.BOOL
-    _KERNEL32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-    _KERNEL32.WaitForSingleObject.restype = wintypes.DWORD
-    _KERNEL32.CloseHandle.argtypes = [wintypes.HANDLE]
-    _KERNEL32.CloseHandle.restype = wintypes.BOOL
-else:
-    _KERNEL32 = None
-
-EVENT_MODIFY_STATE = 0x0002
-WAIT_OBJECT_0 = 0x00000000
-WAIT_TIMEOUT = 0x00000102
-WAIT_FAILED = 0xFFFFFFFF
 
 
 def tr(language: str, en: str, ru: str) -> str:
@@ -216,12 +189,6 @@ class FetchResult:
     error: str | None = None
 
 
-@dataclass
-class UsageWaitResult:
-    status: str
-    text: str | None = None
-
-
 def write_log(message: str) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
@@ -242,44 +209,6 @@ def acquire_app_lock():
     lock_file.write(str(os.getpid()))
     lock_file.flush()
     return lock_file
-
-
-def create_activate_event():
-    if _KERNEL32 is None:
-        return None
-
-    handle = _KERNEL32.CreateEventW(None, False, False, APP_ACTIVATE_EVENT_NAME)
-    if not handle:
-        write_log(f"Could not create activation event: {ctypes.get_last_error()}")
-        return None
-    return handle
-
-
-def close_activate_event(handle) -> None:
-    if _KERNEL32 is None or not handle:
-        return
-    try:
-        _KERNEL32.CloseHandle(handle)
-    except OSError as exc:
-        write_log(f"Could not close activation event: {type(exc).__name__}: {exc}")
-
-
-def signal_existing_instance() -> bool:
-    if _KERNEL32 is None:
-        return False
-
-    handle = _KERNEL32.OpenEventW(EVENT_MODIFY_STATE, False, APP_ACTIVATE_EVENT_NAME)
-    if not handle:
-        write_log(f"Could not open activation event: {ctypes.get_last_error()}")
-        return False
-
-    try:
-        if not _KERNEL32.SetEvent(handle):
-            write_log(f"Could not signal activation event: {ctypes.get_last_error()}")
-            return False
-        return True
-    finally:
-        close_activate_event(handle)
 
 
 def find_chrome_executable() -> str | None:
@@ -827,81 +756,60 @@ class CodexUsageBrowser:
     def __init__(self, chrome_path: str, set_status):
         self.chrome_path = chrome_path
         self.set_status = set_status
-        self.needs_visible_debug = False
 
-    async def fetch(self, *, allow_visible_debug: bool = False) -> FetchResult:
-        has_saved_session = has_saved_chrome_session()
-        if has_saved_session and self.needs_visible_debug and allow_visible_debug:
-            self.set_status("Открою Chrome, чтобы посмотреть ошибку...")
-            return await self._fetch_visible()
-
-        if has_saved_session:
-            self.set_status("Обновляю в полностью невидимом Chrome...")
+    async def fetch(self) -> FetchResult:
+        if has_saved_chrome_session():
+            self.set_status("Обновляю в фоновом Chrome...")
             background_result = await self._fetch_once(visible=False, wait_for_login=False)
             if background_result.status == "ok":
-                self.needs_visible_debug = False
                 return background_result
             write_log(
-                f"Headless fetch did not complete: {background_result.status} "
+                f"Background fetch did not complete: {background_result.status} "
                 f"{background_result.error or ''}"
             )
 
-            if background_result.status == "login_required":
-                self.set_status("Сессия слетела, открою Chrome для входа...")
-                return await self._fetch_visible()
-
-            if allow_visible_debug:
-                self.set_status("Открою Chrome, чтобы посмотреть ошибку...")
-                return await self._fetch_visible()
-
-            self.needs_visible_debug = True
-            return background_result
-
-        self.set_status("Открою Chrome для первого входа...")
-        return await self._fetch_visible()
-
-    async def _fetch_visible(self) -> FetchResult:
-        result = await self._fetch_once(visible=True, wait_for_login=True)
-        if result.status == "ok":
-            self.needs_visible_debug = False
-        return result
+        self.set_status("Открою Chrome для входа или проверки сессии...")
+        return await self._fetch_once(visible=True, wait_for_login=True)
 
     async def _fetch_once(self, *, visible: bool, wait_for_login: bool) -> FetchResult:
         try:
             async with async_playwright() as playwright:
                 launch_args = ["--disable-blink-features=AutomationControlled"]
-                if visible:
-                    launch_args.append("--window-size=1280,900")
+                if not visible:
+                    launch_args.extend([
+                        "--window-position=-32000,-32000",
+                        "--window-size=1280,900",
+                    ])
 
                 context = await playwright.chromium.launch_persistent_context(
                     user_data_dir=str(PROFILE_DIR),
                     executable_path=self.chrome_path,
-                    headless=not visible,
+                    headless=False,
                     viewport={"width": 1280, "height": 900},
                     args=launch_args,
                 )
                 try:
                     page = context.pages[0] if context.pages else await context.new_page()
                     await page.goto(CODEX_USAGE_URL, wait_until="domcontentloaded", timeout=60_000)
-                    wait_result = await self._wait_for_usage_text(
+                    text = await self._wait_for_usage_text(
                         page,
                         visible=visible,
                         wait_for_login=wait_for_login,
                     )
-                    if wait_result.status == "ok":
-                        return FetchResult("ok", text=wait_result.text)
-                    return FetchResult(wait_result.status)
+                    if text:
+                        return FetchResult("ok", text=text)
+                    return FetchResult("login_required" if not visible else "not_ready")
                 finally:
                     await context.close()
         except PlaywrightError as exc:
-            mode = "headless" if not visible else "visible"
+            mode = "background" if not visible else "visible"
             write_log(f"{mode.capitalize()} Chrome failed:\n{exc}")
             return FetchResult("browser_error", error=f"{type(exc).__name__}: {exc}")
         except Exception as exc:
             write_log("Unexpected browser error:\n" + "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
             return FetchResult("browser_error", error=f"{type(exc).__name__}: {exc}")
 
-    async def _wait_for_usage_text(self, page, *, visible: bool, wait_for_login: bool) -> UsageWaitResult:
+    async def _wait_for_usage_text(self, page, *, visible: bool, wait_for_login: bool) -> str | None:
         timeout_seconds = LOGIN_WAIT_SECONDS if wait_for_login else BACKGROUND_WAIT_SECONDS
         deadline = asyncio.get_running_loop().time() + timeout_seconds
 
@@ -918,11 +826,11 @@ class CodexUsageBrowser:
 
             balance = BalanceParser.parse(body_text)
             if balance.has_usage_data:
-                return UsageWaitResult("ok", text=body_text)
+                return body_text
 
             if looks_like_login_page(body_text):
                 if not wait_for_login:
-                    return UsageWaitResult("login_required")
+                    return None
                 remaining = max(0, int(deadline - asyncio.get_running_loop().time()))
                 self.set_status(f"Войдите в ChatGPT в открытом Chrome. Жду: {remaining} сек.")
             elif "chatgpt.com" in page.url and CODEX_USAGE_URL not in page.url:
@@ -933,7 +841,7 @@ class CodexUsageBrowser:
                 self.set_status(f"Жду страницу Usage в {mode}...")
 
             if asyncio.get_running_loop().time() >= deadline:
-                return UsageWaitResult("not_ready")
+                return None
 
             await page.wait_for_timeout(POLL_SECONDS * 1000)
 
@@ -1263,8 +1171,7 @@ def create_tray_image(percent: int | None):
 
 
 class CodexBalanceWidget:
-    def __init__(self, activation_event=None):
-        self.activation_event = activation_event
+    def __init__(self):
         self.chrome_path = find_chrome_executable()
         self.browser = CodexUsageBrowser(self.chrome_path, self.set_status) if self.chrome_path else None
         self.refresh_in_progress = False
@@ -1313,7 +1220,6 @@ class CodexBalanceWidget:
         self.worker = threading.Thread(target=self._run_loop, daemon=True)
         self.worker.start()
         self.setup_tray_icon()
-        self.root.after(250, self.poll_activation_event)
         self.root.after(300, self.schedule_refresh)
         self.root.after(COUNTDOWN_REFRESH_MS, self.update_countdowns)
 
@@ -1597,23 +1503,6 @@ class CodexBalanceWidget:
             pass
         self.update_tray_icon()
 
-    def poll_activation_event(self) -> None:
-        if self.is_exiting:
-            return
-
-        if self.activation_event and _KERNEL32 is not None:
-            result = _KERNEL32.WaitForSingleObject(self.activation_event, 0)
-            if result == WAIT_OBJECT_0:
-                write_log("Activation requested by another launch")
-                self.show_window_from_tray()
-            elif result not in (WAIT_TIMEOUT, WAIT_FAILED):
-                write_log(f"Unexpected activation event result: {result}")
-            elif result == WAIT_FAILED:
-                write_log(f"Could not poll activation event: {ctypes.get_last_error()}")
-                self.activation_event = None
-
-        self.root.after(250, self.poll_activation_event)
-
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
@@ -1731,7 +1620,7 @@ class CodexBalanceWidget:
         if self.refresh_in_progress:
             self.set_status(tr(self.language, "Refresh already in progress...", "Обновление уже идет..."))
             return
-        asyncio.run_coroutine_threadsafe(self.fetch_once(allow_visible_debug=True), self.loop)
+        asyncio.run_coroutine_threadsafe(self.fetch_once(), self.loop)
 
     def open_usage_site(self) -> None:
         webbrowser.open(CODEX_USAGE_URL, new=2)
@@ -1965,7 +1854,6 @@ class CodexBalanceWidget:
             f"Профиль Chrome: {PROFILE_DIR}",
             f"Профиль Chrome существует: {yes_no(PROFILE_DIR.exists())}",
             f"Сохраненная сессия найдена: {yes_no(has_saved_chrome_session())}",
-            f"Следующий ручной запуск откроет Chrome для диагностики: {yes_no(bool(self.browser and self.browser.needs_visible_debug))}",
             "",
             "Последнее обновление",
             f"Последний успешный апдейт: {dt_text(self.last_successful_update)}",
@@ -2005,8 +1893,7 @@ class CodexBalanceWidget:
             "Виджет использует отдельный профиль Chrome в папке codex_chrome_profile.\n\n"
             f"Chrome:\n{chrome_info}\n\n"
             "Если профиль пустой или вход слетел, виджет откроет Chrome. "
-            "Войдите в ChatGPT вручную, дальше успешные обновления будут идти полностью невидимо. "
-            "При техническом сбое видимый Chrome откроется только после ручного нажатия Обновить для проверки.\n\n"
+            "Войдите в ChatGPT вручную, дальше обновления будут идти скрыто.\n\n"
             "Недельный график строится по локальной истории, пока виджет запущен. "
             "Если истории мало или дата сброса не распознана, показывается обычный прогресс-бар.\n\n"
             "Настройки, диагностика, лог и помощь доступны через кнопку настроек. "
@@ -2016,7 +1903,7 @@ class CodexBalanceWidget:
             "двойной клик или меню трея возвращают его, а пункт Выход завершает программу.",
         )
 
-    async def fetch_once(self, *, allow_visible_debug: bool = False) -> None:
+    async def fetch_once(self) -> None:
         if self.refresh_in_progress:
             self.set_status(tr(self.language, "Refresh already in progress...", "Обновление уже идет..."))
             return
@@ -2029,18 +1916,15 @@ class CodexBalanceWidget:
                 self.set_status(tr(self.language, "Google Chrome not found. Set CHROME_PATH.", "Google Chrome не найден. Укажите CHROME_PATH."))
                 return
 
-            result = await self.browser.fetch(allow_visible_debug=allow_visible_debug)
+            result = await self.browser.fetch()
             self.last_fetch_status = result.status
             self.last_fetch_error = result.error
             self.last_usage_text_length = len(result.text) if result.text else None
             if result.status != "ok" or not result.text:
                 if self.current_balance.has_usage_data:
-                    if result.status in {"browser_error", "not_ready"}:
-                        self.set_status(tr(self.language, "Showing last saved data · click Refresh to inspect", "Показаны последние данные · нажмите Обновить для проверки"))
-                    else:
-                        self.set_status(tr(self.language, "Showing last saved data · refresh failed", "Показаны последние данные · обновить не удалось"))
+                    self.set_status(tr(self.language, "Showing last saved data · refresh failed", "Показаны последние данные · обновить не удалось"))
                 elif result.status == "browser_error":
-                    self.set_status(tr(self.language, "Chrome failed. Click Refresh to inspect, or see widget_launch.log", "Chrome дал ошибку. Нажмите Обновить для проверки или смотрите widget_launch.log"))
+                    self.set_status(tr(self.language, "Chrome failed to start. See widget_launch.log", "Chrome не запустился. Подробности в widget_launch.log"))
                 elif result.status == "login_required":
                     self.set_status(tr(self.language, "Sign in to ChatGPT. Click Refresh to open Chrome.", "Нужен вход в ChatGPT. Нажмите Обновить, чтобы открыть Chrome."))
                 else:
@@ -2061,7 +1945,7 @@ class CodexBalanceWidget:
 
     async def refresh_loop(self) -> None:
         while True:
-            await self.fetch_once(allow_visible_debug=False)
+            await self.fetch_once()
             await asyncio.sleep(self.refresh_seconds)
 
     def on_close(self) -> None:
@@ -2104,16 +1988,10 @@ class CodexBalanceWidget:
 if __name__ == "__main__":
     app_lock = acquire_app_lock()
     if not app_lock:
-        if signal_existing_instance():
-            write_log("Existing widget instance signaled for activation")
-        else:
-            write_log("Widget already running; activation signal was not delivered")
+        messagebox.showinfo(WINDOW_TITLE, "Виджет уже запущен.")
         raise SystemExit
 
-    activation_event = create_activate_event()
     atexit.register(app_lock.close)
-    if activation_event:
-        atexit.register(close_activate_event, activation_event)
     write_log(f"Starting widget {APP_VERSION} via {os.sys.executable}")
-    app = CodexBalanceWidget(activation_event)
+    app = CodexBalanceWidget()
     app.run()
