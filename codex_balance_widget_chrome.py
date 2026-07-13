@@ -46,7 +46,7 @@ except Exception as exc:  # Tray is optional: widget must still work without ext
     TRAY_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
 
-APP_VERSION = "v11-tray-icon"
+APP_VERSION = "v13-zero-seconds-weekly-block"
 APP_DIR = Path(__file__).resolve().parent
 CODEX_USAGE_URL = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
 PROFILE_DIR = APP_DIR / "codex_chrome_profile"
@@ -76,7 +76,8 @@ BLANK_WINDOW_ICON_PNG = (
 )
 
 REFRESH_SECONDS = 300
-COUNTDOWN_REFRESH_MS = 30_000
+COUNTDOWN_REFRESH_MS = 1_000
+TRAY_COUNTDOWN_REFRESH_MS = 30_000
 BACKGROUND_WAIT_SECONDS = 45
 LOGIN_WAIT_SECONDS = 300
 POLL_SECONDS = 2
@@ -97,6 +98,7 @@ ORANGE = "#F79009"
 RED = "#D92D20"
 BLUE = "#2E90FA"
 GRID = "#EEF2F7"
+MAX_TRAY_TOOLTIP_LENGTH = 120
 
 DEFAULT_LANGUAGE = "en"
 LANGUAGES = {"en", "ru"}
@@ -311,6 +313,18 @@ def usage_color(percent: int | float | None) -> str:
     return GREEN
 
 
+def is_weekly_limit_exhausted(balance: Balance) -> bool:
+    """Codex is unavailable when the weekly limit is exhausted, even if 5h still shows percent."""
+    return safe_int(balance.weekly_percent) == 0
+
+
+def effective_codex_percent(balance: Balance) -> int | None:
+    """Availability indicator: weekly 0 blocks Codex regardless of the 5-hour value."""
+    if is_weekly_limit_exhausted(balance):
+        return 0
+    return safe_int(balance.five_hour_percent)
+
+
 def normalize_reset_text(text: str | None) -> str | None:
     if not text:
         return None
@@ -462,6 +476,26 @@ def format_countdown(reset_dt: datetime | None, reset_text: str | None, language
         duration = tr(language, f"{mins}m", f"{mins} мин")
 
     return tr(language, f"Reset in {duration} - {target}", f"Сброс через {duration} - {target}")
+
+
+def format_compact_countdown(reset_dt: datetime | None, language: str = DEFAULT_LANGUAGE) -> str | None:
+    """Compact large countdown for the main value field when a blocking limit is exhausted."""
+    if reset_dt is None:
+        return None
+
+    remaining = reset_dt - datetime.now()
+    total_seconds = int(remaining.total_seconds())
+    if total_seconds <= 0:
+        return "0:00:00"
+
+    days, rest_seconds = divmod(total_seconds, 24 * 60 * 60)
+    hours, rest_seconds = divmod(rest_seconds, 60 * 60)
+    minutes, seconds = divmod(rest_seconds, 60)
+
+    if days > 0:
+        day_suffix = tr(language, "d", "д")
+        return f"{days}{day_suffix} {hours:02d}:{minutes:02d}:{seconds:02d}"
+    return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
 class BalanceParser:
@@ -1142,21 +1176,29 @@ def build_tray_tooltip(balance: Balance, last_successful_update: datetime | None
     five_hour = safe_int(balance.five_hour_percent)
     weekly = safe_int(balance.weekly_percent)
     credits = balance.credits or tr(language, "not found", "не найдено")
+    blocked_by_weekly = weekly == 0
 
-    five_text = f"{five_hour}%" if five_hour is not None else tr(language, "not found", "не найдено")
+    if blocked_by_weekly:
+        availability_text = tr(language, "Codex: unavailable, weekly 0%", "Codex: недоступен, неделя 0%")
+        five_text = tr(language, "blocked", "блок")
+    else:
+        availability_text = tr(language, "Codex: available", "Codex: доступен")
+        five_text = f"{five_hour}%" if five_hour is not None else tr(language, "not found", "не найдено")
+
     weekly_text = f"{weekly}%" if weekly is not None else tr(language, "not found", "не найдено")
     updated_text = last_successful_update.strftime("%H:%M") if last_successful_update else tr(language, "no", "нет")
     status_text = status or tr(language, "no status", "нет статуса")
 
     tooltip = (
         "Codex balance\n"
+        f"{availability_text}\n"
         f"{tr(language, '5h', '5ч')}: {five_text}, {format_tray_reset(balance.five_hour_reset_text, language)}\n"
         f"{tr(language, 'Week', 'Нед')}: {weekly_text}, {format_tray_reset(balance.weekly_reset_text, language)}\n"
         f"{tr(language, 'Cr', 'Кр')}: {credits} | {tr(language, 'Upd', 'Обн')}: {updated_text}\n"
         f"{status_text}"
     )
-    if len(tooltip) > 120:
-        tooltip = tooltip[:117].rstrip() + "..."
+    if len(tooltip) > MAX_TRAY_TOOLTIP_LENGTH:
+        tooltip = tooltip[:MAX_TRAY_TOOLTIP_LENGTH - 3].rstrip() + "..."
     return tooltip
 
 
@@ -1241,6 +1283,7 @@ class CodexBalanceWidget:
         self.tray_icon = None
         self.tray_thread: threading.Thread | None = None
         self.tray_enabled = False
+        self.last_countdown_tray_update: datetime | None = None
         self.is_exiting = False
         self.window_visible = True
         self.last_visible_geometry = str(self.app_settings.get("geometry", DEFAULT_GEOMETRY))
@@ -1466,14 +1509,14 @@ class CodexBalanceWidget:
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem(tr(self.language, "Exit", "Выход"), self._tray_exit_app),
             )
-            icon_image = create_tray_image(safe_int(self.current_balance.five_hour_percent))
+            icon_image = create_tray_image(effective_codex_percent(self.current_balance))
             self.tray_icon = pystray.Icon(
                 "codex_balance_widget",
                 icon_image,
                 build_tray_tooltip(self.current_balance, self.last_successful_update, self.status_var.get(), self.language),
                 menu,
             )
-            self.tray_thread = threading.Thread(target=self.tray_icon.run, name="CodexBalanceTray", daemon=True)
+            self.tray_thread = threading.Thread(target=self._run_tray_icon, name="CodexBalanceTray", daemon=True)
             self.tray_thread.start()
             self.tray_enabled = True
             write_log("Tray icon started")
@@ -1482,20 +1525,39 @@ class CodexBalanceWidget:
             self.tray_enabled = False
             write_log("Tray icon failed:\n" + "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
 
+    def _run_tray_icon(self) -> None:
+        if not self.tray_icon:
+            return
+        try:
+            self.tray_icon.run(setup=self._setup_visible_tray_icon)
+        except Exception as exc:
+            self.tray_enabled = False
+            write_log("Tray icon thread failed:\n" + "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+
+    def _setup_visible_tray_icon(self, icon) -> None:
+        try:
+            icon.visible = True
+            write_log(f"Tray icon visible={getattr(icon, 'visible', None)}")
+        except Exception as exc:
+            self.tray_enabled = False
+            write_log(f"Could not make tray icon visible: {type(exc).__name__}: {exc}")
+
     def update_tray_icon(self) -> None:
         if not self.tray_icon or pystray is None or Image is None:
             return
         try:
-            percent = safe_int(self.current_balance.five_hour_percent)
+            percent = effective_codex_percent(self.current_balance)
             icon_image = create_tray_image(percent)
             if icon_image is not None:
-                self.tray_icon.icon = icon_image
+                    self.tray_icon.icon = icon_image
             self.tray_icon.title = build_tray_tooltip(
                 self.current_balance,
                 self.last_successful_update,
                 self.status_var.get(),
                 self.language,
             )
+            if not getattr(self.tray_icon, "visible", False):
+                self.tray_icon.visible = True
         except Exception as exc:
             write_log(f"Could not update tray icon: {type(exc).__name__}: {exc}")
 
@@ -1580,6 +1642,46 @@ class CodexBalanceWidget:
         self.apply_balance_ui(balance, append_history=False, updated_at=timestamp, from_history=True)
         self.set_status(tr(self.language, "Last saved data · updating...", "Данные из истории · обновление..."))
 
+    def update_five_hour_value_display(self) -> None:
+        five_hour_percent = safe_int(self.current_balance.five_hour_percent)
+        weekly_percent = safe_int(self.current_balance.weekly_percent)
+        reset_dt = parse_reset_datetime(self.current_balance.five_hour_reset_text)
+        value_label = self.five_hour_card["value_label"]
+
+        if weekly_percent == 0:
+            self.five_hour_value_var.set(tr(self.language, "Blocked", "Блок"))
+            value_label.configure(fg=RED, font=("Segoe UI", 15, "bold"))
+            return
+
+        if five_hour_percent == 0:
+            compact_countdown = format_compact_countdown(reset_dt, self.language)
+            if compact_countdown:
+                self.five_hour_value_var.set(compact_countdown)
+                value_label.configure(fg=RED, font=("Segoe UI", 16, "bold"))
+                return
+
+        self.five_hour_value_var.set(
+            f"{five_hour_percent}%" if five_hour_percent is not None else tr(self.language, "not found", "не найдено")
+        )
+        value_label.configure(fg=usage_color(five_hour_percent), font=("Segoe UI", 12, "bold"))
+
+    def update_weekly_value_display(self) -> None:
+        weekly_percent = safe_int(self.current_balance.weekly_percent)
+        reset_dt = parse_reset_datetime(self.current_balance.weekly_reset_text)
+        value_label = self.weekly_card["value_label"]
+
+        if weekly_percent == 0:
+            compact_countdown = format_compact_countdown(reset_dt, self.language)
+            if compact_countdown:
+                self.weekly_value_var.set(compact_countdown)
+                value_label.configure(fg=RED, font=("Segoe UI", 15, "bold"))
+                return
+
+        self.weekly_value_var.set(
+            f"{weekly_percent}%" if weekly_percent is not None else tr(self.language, "not found", "не найдено")
+        )
+        value_label.configure(fg=usage_color(weekly_percent), font=("Segoe UI", 12, "bold"))
+
     def apply_balance_ui(
         self,
         balance: Balance,
@@ -1593,13 +1695,11 @@ class CodexBalanceWidget:
         weekly_percent = safe_int(balance.weekly_percent)
         credits = balance.credits or tr(self.language, "not found", "не найдено")
 
-        self.five_hour_value_var.set(f"{five_hour_percent}%" if five_hour_percent is not None else tr(self.language, "not found", "не найдено"))
-        self.weekly_value_var.set(f"{weekly_percent}%" if weekly_percent is not None else tr(self.language, "not found", "не найдено"))
+        self.update_five_hour_value_display()
+        self.update_weekly_value_display()
         self.credits_var.set(tr(self.language, f"Credits: {credits}", f"Кредиты: {credits}"))
 
-        self.five_hour_card["value_label"].configure(fg=usage_color(five_hour_percent))
-        self.weekly_card["value_label"].configure(fg=usage_color(weekly_percent))
-        self.five_hour_progress.set_value(five_hour_percent)
+        self.five_hour_progress.set_value(0 if weekly_percent == 0 else five_hour_percent)
         self.weekly_progress.set_value(weekly_percent)
 
         if append_history:
@@ -1658,10 +1758,21 @@ class CodexBalanceWidget:
     def update_countdowns(self, *, schedule_next: bool = True) -> None:
         five_hour_dt = parse_reset_datetime(self.current_balance.five_hour_reset_text)
         weekly_dt = parse_reset_datetime(self.current_balance.weekly_reset_text)
-        self.five_hour_reset_var.set(format_countdown(five_hour_dt, self.current_balance.five_hour_reset_text, self.language))
+        if is_weekly_limit_exhausted(self.current_balance):
+            self.five_hour_reset_var.set(tr(self.language, "Blocked by weekly limit", "Заблокировано недельным лимитом"))
+        else:
+            self.five_hour_reset_var.set(format_countdown(five_hour_dt, self.current_balance.five_hour_reset_text, self.language))
         self.weekly_reset_var.set(format_countdown(weekly_dt, self.current_balance.weekly_reset_text, self.language))
+        self.update_five_hour_value_display()
+        self.update_weekly_value_display()
         self.update_weekly_chart()
-        self.update_tray_icon()
+        now = datetime.now()
+        if (
+            self.last_countdown_tray_update is None
+            or (now - self.last_countdown_tray_update).total_seconds() * 1000 >= TRAY_COUNTDOWN_REFRESH_MS
+        ):
+            self.last_countdown_tray_update = now
+            self.update_tray_icon()
         if schedule_next:
             self.root.after(COUNTDOWN_REFRESH_MS, self.update_countdowns)
 
@@ -1987,7 +2098,10 @@ class CodexBalanceWidget:
             if balance.has_usage_data:
                 self.last_successful_update = datetime.now()
                 self.update_balance_ui(balance)
-                self.set_status(tr(self.language, "Data is up to date", "Данные актуальны"))
+                if is_weekly_limit_exhausted(balance):
+                    self.set_status(tr(self.language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан"))
+                else:
+                    self.set_status(tr(self.language, "Data is up to date", "Данные актуальны"))
             elif self.current_balance.has_usage_data:
                 self.set_status(tr(self.language, "Showing last saved data · new data not recognized", "Показаны последние данные · новые не распознаны"))
             else:
