@@ -69,7 +69,10 @@ PROFILE_CACHE_DIRS = [
     ("Default", "DawnWebGPUCache"),
     ("Default", "DawnGraphiteCache"),
     ("Default", "ShaderCache"),
+    ("Default", "Shared Dictionary"),
     ("Default", "Service Worker", "CacheStorage"),
+    ("component_crx_cache",),
+    ("extensions_crx_cache",),
 ]
 BLANK_WINDOW_ICON_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAJUlEQVR4nGP8//8/IwMFgIkSzaMGQAATA4WAadQAhtEwYKA8DABnpgMeG0xQggAAAABJRU5ErkJggg=="
@@ -887,6 +890,7 @@ class CodexUsageBrowser:
                     return FetchResult("login_required" if not visible else "not_ready")
                 finally:
                     await context.close()
+                    prune_chrome_profile_cache()
         except PlaywrightError as exc:
             mode = "background" if not visible else "visible"
             write_log(f"{mode.capitalize()} Chrome failed:\n{exc}")
