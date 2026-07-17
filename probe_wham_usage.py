@@ -9,8 +9,8 @@ primary/secondary position — see 01-RESEARCH.md), extracts fields for the
 pretty-printed JSON payload plus the extracted fields, and writes a
 redacted fixture file.
 
-The access token is never printed, logged, or included in any error
-message, including under --debug.
+The access token is kept out of stdout, logs and any error message,
+including under --debug.
 
 Only stdlib is used: json, os, sys, base64, argparse, urllib.request,
 urllib.error, datetime, pathlib.
@@ -245,6 +245,155 @@ def redaction_clean(text: str) -> bool:
     return "eyJ" not in text and "@" not in text
 
 
-# NOTE: HTTP layer, fixture writer and CLI entry point are added in Task 2
-# (build_headers / fetch_usage / write_fixture / main), following the same
-# TDD RED -> GREEN sequence.
+def build_headers(access_token: str, account_id: str | None) -> dict[str, str]:
+    """Build request headers. The Bearer value is kept out of stdout entirely."""
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+        "User-Agent": "probe-wham-usage/0.1",
+    }
+    if account_id:
+        headers["ChatGPT-Account-Id"] = account_id
+    return headers
+
+
+def fetch_usage(access_token: str, account_id: str | None, timeout: float) -> tuple[int, dict]:
+    """GET wham/usage and return (status, payload) or raise ProbeError.
+
+    Every failure branch maps to a single Russian diagnostic string.
+    Request headers (including the Bearer token) are never included in
+    any error message.
+    """
+    request = urllib.request.Request(
+        USAGE_URL, method="GET", headers=build_headers(access_token, account_id)
+    )
+
+    content_type = ""
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = int(getattr(response, "status", 200))
+            content_type = response.headers.get("Content-Type", "") or ""
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = b""
+        try:
+            body = exc.read()
+        except Exception:
+            pass
+        error_content_type = ""
+        if exc.headers is not None:
+            error_content_type = exc.headers.get("Content-Type", "") or ""
+
+        if exc.code == 401:
+            raise ProbeError(
+                "Токен Codex истёк или недействителен (HTTP 401). Запустите "
+                "любую команду codex — CLI обновит auth.json — и повторите."
+            ) from exc
+        if exc.code == 403:
+            if "html" in error_content_type.lower():
+                snippet = body.decode("utf-8", errors="replace")[:200]
+                raise ProbeError(
+                    "Cloudflare-заслон (HTTP 403, HTML). Повторите позже.\n"
+                    f"{snippet}"
+                ) from exc
+            raise ProbeError(
+                "Доступ запрещён (HTTP 403). Проверьте ChatGPT-Account-Id и "
+                "доступность эндпоинта wham/usage для этого аккаунта."
+            ) from exc
+        if exc.code == 429:
+            raise ProbeError("Слишком много запросов (HTTP 429). Повторите позже.") from exc
+        raise ProbeError(f"wham/usage вернул HTTP {exc.code}.") from exc
+    except urllib.error.URLError as exc:
+        raise ProbeError(f"Нет соединения с chatgpt.com: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise ProbeError(f"chatgpt.com не ответил за {timeout} с.") from exc
+
+    if "json" not in content_type.lower():
+        raise ProbeError(f"Ответ не является JSON (Content-Type: {content_type}).")
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ProbeError("Ответ не является JSON.") from exc
+    if not isinstance(payload, dict):
+        raise ProbeError("wham/usage вернул данные неожиданного формата.")
+
+    return status, payload
+
+
+def write_fixture(payload: dict, path: Path) -> None:
+    """Redact payload, verify the redaction, then write the fixture file.
+
+    If the post-check fails (redacted text still contains 'eyJ' or '@'),
+    raises ProbeError and does NOT write the file.
+    """
+    redacted = redact(payload)
+    text = json.dumps(redacted, ensure_ascii=False, indent=2, sort_keys=True)
+    if not redaction_clean(text):
+        raise ProbeError(
+            "Редакция фикстуры не прошла пост-проверку (eyJ/@) — файл не записан."
+        )
+    path.write_text(text, encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Проба эндпоинта wham/usage Codex")
+    parser.add_argument("--fixture", default="wham_usage_fixture.json")
+    parser.add_argument("--no-fixture", action="store_true")
+    parser.add_argument("--timeout", type=float, default=REQUEST_TIMEOUT_SECONDS)
+    parser.add_argument("--debug", action="store_true")
+    args = parser.parse_args(argv)
+
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+    try:
+        access_token, account_id = load_tokens(auth_json_path())
+
+        expires_at = jwt_exp(access_token)
+        if expires_at is not None and expires_at < datetime.now():
+            print(
+                f"JWT истёк {expires_at:%Y-%m-%d %H:%M} — запрос всё равно "
+                "будет выполнен"
+            )
+
+        status, payload = fetch_usage(access_token, account_id, args.timeout)
+        print(f"HTTP status: {status}")
+
+        redacted_payload = redact(payload)
+        print(json.dumps(redacted_payload, ensure_ascii=False, indent=2))
+
+        fields = extract_fields(payload)
+        print("Extracted fields (Balance):")
+        for label in (
+            "five_hour_percent",
+            "weekly_percent",
+            "credits",
+            "five_hour_reset_text",
+            "weekly_reset_text",
+        ):
+            value = fields.get(label)
+            print(f"  {label}: {value if value is not None else 'отсутствует в ответе'}")
+        for window in fields.get("windows", []):
+            seconds = window.get("limit_window_seconds")
+            used = window.get("used_percent")
+            reset_text = _reset_text(window) or "?"
+            print(f"  window {seconds}s: used {used}%, reset {reset_text}")
+
+        if not args.no_fixture:
+            fixture_path = Path(args.fixture)
+            write_fixture(payload, fixture_path)
+            print(f"Фикстура записана: {fixture_path}")
+
+        return 0
+    except ProbeError as exc:
+        print(str(exc))
+        if args.debug:
+            traceback.print_exc()
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
