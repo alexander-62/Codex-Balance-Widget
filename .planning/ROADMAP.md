@@ -31,7 +31,7 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Проба probe_wham_usage.py (чистое ядро + HTTP + CLI-диагностика) и unit-тесты test_probe_wham_usage.py (wave 1, autonomous)
+- [x] 01-01-PLAN.md — Проба probe_wham_usage.py (чистое ядро + HTTP + CLI-диагностика) и unit-тесты test_probe_wham_usage.py (wave 1, autonomous)
 - [ ] 01-02-PLAN.md — Живой запуск: HTTP 200, фикстура wham_usage_fixture.json с редакцией, git-чистота + human-verify (wave 2, checkpoint)
 
 ### Phase 2: JSON provider integration

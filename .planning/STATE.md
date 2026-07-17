@@ -1,10 +1,14 @@
 ---
-gsd_state_version: '1.0'
-status: planning
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: executing
+last_updated: "2026-07-17T14:47:18.561Z"
+last_activity: 2026-07-17 -- Phase 01 execution started
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -16,14 +20,14 @@ progress:
 See: .planning/ROADMAP.md (updated 2026-07-17)
 
 **Core value:** Виджет баланса Codex без Chrome-скрейпинга — надёжный JSON-источник.
-**Current focus:** Phase 1: JSON endpoint probe
+**Current focus:** Phase 01 — json-endpoint-probe
 
 ## Current Position
 
-Phase: 1 of 2 (JSON endpoint probe)
-Plan: 0 of TBD
-Status: Ready to plan
-Last activity: 2026-07-17 — Bootstrapped roadmap from /gsd-explore findings (seed codex-json-endpoint)
+Phase: 01 (json-endpoint-probe) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 01
+Last activity: 2026-07-17 -- Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
