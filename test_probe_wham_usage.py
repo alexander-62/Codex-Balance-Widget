@@ -210,5 +210,38 @@ class TestLoadTokens(unittest.TestCase):
             self.assertIsNone(account_id)
 
 
+class TestFixtureAndHeaders(unittest.TestCase):
+    def test_write_fixture_success(self):
+        payload = {"email": "e@example.com", "value": 1}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "fixture.json"
+            probe_wham_usage.write_fixture(payload, path)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("<redacted>", text)
+            self.assertNotIn("@", text)
+            self.assertNotIn("eyJ", text)
+
+    def test_write_fixture_redaction_failure_no_file_written(self):
+        # "weird_field" is outside the redact() denylist and doesn't
+        # contain "token", so the eyJ-looking value survives redact() —
+        # the post-check must catch it and refuse to write the file.
+        payload = {"weird_field": "eyJhbGciOiJIUzI1NiJ9"}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "fixture.json"
+            with self.assertRaises(probe_wham_usage.ProbeError):
+                probe_wham_usage.write_fixture(payload, path)
+            self.assertFalse(path.exists())
+
+    def test_build_headers_with_account_id(self):
+        headers = probe_wham_usage.build_headers("tok", "acc1")
+        self.assertEqual(headers["ChatGPT-Account-Id"], "acc1")
+        self.assertTrue(headers["Authorization"].startswith("Bearer "))
+        self.assertEqual(headers["Accept"], "application/json")
+
+    def test_build_headers_without_account_id(self):
+        headers = probe_wham_usage.build_headers("tok", None)
+        self.assertNotIn("ChatGPT-Account-Id", headers)
+
+
 if __name__ == "__main__":
     unittest.main()
