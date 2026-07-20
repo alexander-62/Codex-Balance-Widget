@@ -37,9 +37,14 @@ Plans:
 ### Phase 2: JSON provider integration
 **Goal**: Виджет получает данные через JSON-эндпоинт как основной источник; Chrome-скрейпинг остаётся фолбэком до подтверждения стабильности.
 **Depends on**: Phase 1
-**Requirements**: TBD
+**Requirements**: JSONPROV-01, JSONPROV-02, JSONPROV-03
 **Success Criteria** (what must be TRUE):
-  1. Обычный цикл обновления не запускает Chrome.
-  2. При ошибке JSON-пути виджет падает обратно на текущий Chrome-механизм.
-  3. Лог фиксирует источник каждого успешного обновления (json | chrome).
-**Plans**: TBD
+  1. Обычный цикл обновления не запускает Chrome. (JSONPROV-01)
+  2. При ошибке JSON-пути виджет падает обратно на текущий Chrome-механизм. (JSONPROV-02)
+  3. Лог фиксирует источник каждого успешного обновления (json | chrome). (JSONPROV-03)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — probe_wham_usage.py: ProbeError.retryable + json_usage_provider.py (async, retry-once по D-02/D-03) (wave 1, autonomous)
+- [ ] 02-02-PLAN.md — Чистые хелперы виджета: ISO reset-дата в parse_reset_datetime, build_balance_from_json_fields, plan_fetch_outcome (wave 1, autonomous)
+- [ ] 02-03-PLAN.md — Врезка в fetch_once: JSON основной источник + Chrome-фолбэк + лог источника, живая проверка (wave 2, checkpoint)
