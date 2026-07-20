@@ -54,8 +54,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — probe_wham_usage.py: ProbeError.retryable + json_usage_provider.py (async, retry-once по D-02/D-03) (wave 1, autonomous)
-- [ ] 02-02-PLAN.md — Чистые хелперы виджета: ISO reset-дата в parse_reset_datetime, build_balance_from_json_fields, plan_fetch_outcome (wave 1, autonomous)
+- [x] 02-01-PLAN.md — probe_wham_usage.py: ProbeError.retryable + json_usage_provider.py (async, retry-once по D-02/D-03) (wave 1, autonomous)
+- [x] 02-02-PLAN.md — Чистые хелперы виджета: ISO reset-дата в parse_reset_datetime, build_balance_from_json_fields, plan_fetch_outcome (wave 1, autonomous)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
