@@ -13,7 +13,7 @@
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: JSON endpoint probe** - Отдельный тестовый скрипт: auth.json → wham/usage → структура ответа. Рабочий код виджета не изменяется.
+- [x] **Phase 1: JSON endpoint probe** - Отдельный тестовый скрипт: auth.json → wham/usage → структура ответа. Рабочий код виджета не изменяется. (completed 2026-07-20)
 - [ ] **Phase 2: JSON provider integration** - Встроить JSON-источник в виджет с фолбэком на Chrome-скрейпинг.
 
 ## Phase Details
@@ -32,7 +32,7 @@
 
 Plans:
 - [x] 01-01-PLAN.md — Проба probe_wham_usage.py (чистое ядро + HTTP + CLI-диагностика) и unit-тесты test_probe_wham_usage.py (wave 1, autonomous)
-- [ ] 01-02-PLAN.md — Живой запуск: HTTP 200, фикстура wham_usage_fixture.json с редакцией, git-чистота + human-verify (wave 2, checkpoint)
+- [x] 01-02-PLAN.md — Живой запуск: HTTP 200, фикстура wham_usage_fixture.json с редакцией, git-чистота + human-verify (wave 2, checkpoint)
 
 ### Phase 2: JSON provider integration
 **Goal**: Виджет получает данные через JSON-эндпоинт как основной источник; Chrome-скрейпинг остаётся фолбэком до подтверждения стабильности.
