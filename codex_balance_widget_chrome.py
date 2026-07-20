@@ -394,6 +394,23 @@ def parse_reset_datetime(reset_text: str | None, *, now: datetime | None = None)
             except ValueError:
                 return None
 
+    # ISO date (from probe_wham_usage._reset_text): 2026-07-27 18:33
+    iso_match = re.search(
+        r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})",
+        lower,
+    )
+    if iso_match:
+        try:
+            return datetime(
+                int(iso_match.group("year")),
+                int(iso_match.group("month")),
+                int(iso_match.group("day")),
+                int(iso_match.group("hour")),
+                int(iso_match.group("minute")),
+            )
+        except ValueError:
+            return None
+
     # Relative English date: today 18:33 / tomorrow at 8:33 PM
     relative_match = re.search(
         r"(?P<dayword>today|tomorrow)\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})\s*(?P<ampm>am|pm)?",
@@ -499,6 +516,17 @@ def format_compact_countdown(reset_dt: datetime | None, language: str = DEFAULT_
         day_suffix = tr(language, "d", "д")
         return f"{days}{day_suffix} {hours:02d}:{minutes:02d}:{seconds:02d}"
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
+
+def build_balance_from_json_fields(fields: dict) -> Balance:
+    """Map probe_wham_usage.extract_fields() output onto Balance, no text parsing."""
+    return Balance(
+        five_hour_percent=fields.get("five_hour_percent"),
+        weekly_percent=fields.get("weekly_percent"),
+        credits=fields.get("credits"),
+        five_hour_reset_text=normalize_reset_text(fields.get("five_hour_reset_text")),
+        weekly_reset_text=normalize_reset_text(fields.get("weekly_reset_text")),
+    )
 
 
 class BalanceParser:
