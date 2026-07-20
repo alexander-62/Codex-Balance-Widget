@@ -49,7 +49,16 @@ REDACT_KEYS = frozenset(
 
 
 class ProbeError(RuntimeError):
-    """Human-readable (Russian) diagnostic message — the only output on failure."""
+    """Human-readable (Russian) diagnostic message — the only output on failure.
+
+    `retryable` (keyword-only, default False) marks transient error classes
+    (HTTP 429, network error, timeout — see fetch_usage) that are safe for a
+    caller to retry once. All other classes default to non-retryable.
+    """
+
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.retryable = retryable
 
 
 def auth_json_path() -> Path:
@@ -301,12 +310,18 @@ def fetch_usage(access_token: str, account_id: str | None, timeout: float) -> tu
                 "доступность эндпоинта wham/usage для этого аккаунта."
             ) from exc
         if exc.code == 429:
-            raise ProbeError("Слишком много запросов (HTTP 429). Повторите позже.") from exc
+            raise ProbeError(
+                "Слишком много запросов (HTTP 429). Повторите позже.", retryable=True
+            ) from exc
         raise ProbeError(f"wham/usage вернул HTTP {exc.code}.") from exc
     except urllib.error.URLError as exc:
-        raise ProbeError(f"Нет соединения с chatgpt.com: {exc.reason}") from exc
+        raise ProbeError(
+            f"Нет соединения с chatgpt.com: {exc.reason}", retryable=True
+        ) from exc
     except TimeoutError as exc:
-        raise ProbeError(f"chatgpt.com не ответил за {timeout} с.") from exc
+        raise ProbeError(
+            f"chatgpt.com не ответил за {timeout} с.", retryable=True
+        ) from exc
 
     if "json" not in content_type.lower():
         raise ProbeError(f"Ответ не является JSON (Content-Type: {content_type}).")

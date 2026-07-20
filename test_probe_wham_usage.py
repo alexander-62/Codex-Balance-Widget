@@ -8,11 +8,15 @@ tempfile.TemporaryDirectory.
 from __future__ import annotations
 
 import base64
+import io
 import json
 import tempfile
 import unittest
+import urllib.error
 from datetime import datetime
+from email.message import Message
 from pathlib import Path
+from unittest.mock import patch
 
 import probe_wham_usage
 
@@ -241,6 +245,108 @@ class TestFixtureAndHeaders(unittest.TestCase):
     def test_build_headers_without_account_id(self):
         headers = probe_wham_usage.build_headers("tok", None)
         self.assertNotIn("ChatGPT-Account-Id", headers)
+
+
+def _http_error(code: int, content_type: str | None = None, body: bytes = b"") -> urllib.error.HTTPError:
+    hdrs = Message()
+    if content_type is not None:
+        hdrs.add_header("Content-Type", content_type)
+    fp = io.BytesIO(body)
+    return urllib.error.HTTPError(
+        "https://chatgpt.com/backend-api/wham/usage", code, "msg", hdrs, fp
+    )
+
+
+class _FakeResponse:
+    def __init__(self, status: int, content_type: str, body: bytes) -> None:
+        self.status = status
+        self.headers = Message()
+        self.headers.add_header("Content-Type", content_type)
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *exc_info) -> bool:
+        return False
+
+
+class TestProbeErrorRetryable(unittest.TestCase):
+    def test_default_not_retryable(self):
+        exc = probe_wham_usage.ProbeError("msg")
+        self.assertFalse(exc.retryable)
+
+    def test_explicit_retryable(self):
+        exc = probe_wham_usage.ProbeError("msg", retryable=True)
+        self.assertTrue(exc.retryable)
+        self.assertEqual(str(exc), "msg")
+
+
+class TestFetchUsageErrorClassification(unittest.TestCase):
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_401_not_retryable(self, mock_urlopen):
+        mock_urlopen.side_effect = _http_error(401)
+        with self.assertRaises(probe_wham_usage.ProbeError) as ctx:
+            probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertFalse(ctx.exception.retryable)
+        self.assertIn("401", str(ctx.exception))
+
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_403_html_not_retryable(self, mock_urlopen):
+        mock_urlopen.side_effect = _http_error(403, "text/html", b"cloudflare body")
+        with self.assertRaises(probe_wham_usage.ProbeError) as ctx:
+            probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertFalse(ctx.exception.retryable)
+        self.assertIn("Cloudflare", str(ctx.exception))
+
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_403_json_not_retryable(self, mock_urlopen):
+        mock_urlopen.side_effect = _http_error(403, "application/json", b"{}")
+        with self.assertRaises(probe_wham_usage.ProbeError) as ctx:
+            probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertFalse(ctx.exception.retryable)
+        self.assertIn("403", str(ctx.exception))
+
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_429_retryable(self, mock_urlopen):
+        mock_urlopen.side_effect = _http_error(429)
+        with self.assertRaises(probe_wham_usage.ProbeError) as ctx:
+            probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertTrue(ctx.exception.retryable)
+        self.assertIn("429", str(ctx.exception))
+
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_500_not_retryable(self, mock_urlopen):
+        mock_urlopen.side_effect = _http_error(500)
+        with self.assertRaises(probe_wham_usage.ProbeError) as ctx:
+            probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertFalse(ctx.exception.retryable)
+
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_url_error_retryable(self, mock_urlopen):
+        mock_urlopen.side_effect = urllib.error.URLError("no route")
+        with self.assertRaises(probe_wham_usage.ProbeError) as ctx:
+            probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertTrue(ctx.exception.retryable)
+        self.assertIn("chatgpt.com", str(ctx.exception))
+
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_timeout_retryable(self, mock_urlopen):
+        mock_urlopen.side_effect = TimeoutError()
+        with self.assertRaises(probe_wham_usage.ProbeError) as ctx:
+            probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertTrue(ctx.exception.retryable)
+
+    @patch("probe_wham_usage.urllib.request.urlopen")
+    def test_success_returns_status_and_payload(self, mock_urlopen):
+        body = json.dumps({"ok": True}).encode("utf-8")
+        mock_urlopen.return_value = _FakeResponse(200, "application/json", body)
+        status, payload = probe_wham_usage.fetch_usage("tok", None, 5)
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, {"ok": True})
 
 
 if __name__ == "__main__":
