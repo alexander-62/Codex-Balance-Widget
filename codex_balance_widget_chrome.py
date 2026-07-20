@@ -529,6 +529,74 @@ def build_balance_from_json_fields(fields: dict) -> Balance:
     )
 
 
+@dataclass
+class FetchOutcome:
+    source: str
+    balance: Balance | None
+    status_message: str
+    log_line: str
+
+
+def plan_fetch_outcome(
+    *,
+    json_status: str,
+    json_fields: dict | None,
+    json_error: str | None,
+    chrome_attempted: bool,
+    chrome_status: str | None,
+    chrome_error: str | None,
+    chrome_text: str | None,
+    has_existing_data: bool,
+    language: str,
+) -> FetchOutcome:
+    """Decide what to show/log for a fetch attempt (JSON primary, Chrome fallback).
+
+    Pure decision function mirroring fetch_once's current branching so the
+    async orchestrator (Plan 02-03) can become a thin wrapper around this.
+    """
+    if json_status == "ok":
+        balance = build_balance_from_json_fields(json_fields or {})
+        if is_weekly_limit_exhausted(balance):
+            message = tr(language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан")
+        else:
+            message = tr(language, "Data is up to date", "Данные актуальны")
+        return FetchOutcome("json", balance, message, "Balance updated (source: json)")
+
+    if not chrome_attempted:
+        message = tr(language, "Google Chrome not found. Set CHROME_PATH.", "Google Chrome не найден. Укажите CHROME_PATH.")
+        log_line = f"JSON fetch failed ({json_error}); Chrome unavailable"
+        return FetchOutcome("none", None, message, log_line)
+
+    suffix = f" · {tr(language, 'Chrome fallback', 'Chrome-фолбэк')}"
+    fallback_log = f"JSON fetch failed ({json_error}); Chrome fallback status={chrome_status} error={chrome_error or ''}"
+
+    if chrome_status == "ok" and chrome_text:
+        balance = BalanceParser.parse(chrome_text)
+        if balance.has_usage_data:
+            if is_weekly_limit_exhausted(balance):
+                message = tr(language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан") + suffix
+            else:
+                message = tr(language, "Data is up to date", "Данные актуальны") + suffix
+            return FetchOutcome("chrome", balance, message, "Balance updated (source: chrome)")
+        if has_existing_data:
+            message = tr(language, "Showing last saved data · new data not recognized", "Показаны последние данные · новые не распознаны") + suffix
+            return FetchOutcome("none", None, message, fallback_log)
+        message = tr(language, "Data not recognized", "Данные не распознаны") + suffix
+        return FetchOutcome("none", None, message, fallback_log)
+
+    if has_existing_data:
+        message = tr(language, "Showing last saved data · refresh failed", "Показаны последние данные · обновить не удалось") + suffix
+        return FetchOutcome("none", None, message, fallback_log)
+    if chrome_status == "browser_error":
+        message = tr(language, "Chrome failed to start. See widget_launch.log", "Chrome не запустился. Подробности в widget_launch.log")
+        return FetchOutcome("none", None, message, fallback_log)
+    if chrome_status == "login_required":
+        message = tr(language, "Sign in to ChatGPT. Click Refresh to open Chrome.", "Нужен вход в ChatGPT. Нажмите Обновить, чтобы открыть Chrome.")
+        return FetchOutcome("none", None, message, fallback_log)
+    message = tr(language, "Usage data timed out. Click Refresh.", "Не дождался данных Usage. Нажмите Обновить.") + suffix
+    return FetchOutcome("none", None, message, fallback_log)
+
+
 class BalanceParser:
     @staticmethod
     def parse(text: str) -> Balance:
