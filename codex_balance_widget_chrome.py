@@ -45,6 +45,7 @@ except Exception as exc:  # Tray is optional: widget must still work without ext
     ImageFont = None
     TRAY_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
+import json_usage_provider
 
 APP_VERSION = "v13-zero-seconds-weekly-block"
 APP_DIR = Path(__file__).resolve().parent
@@ -1368,6 +1369,7 @@ class CodexBalanceWidget:
     def __init__(self):
         self.chrome_path = find_chrome_executable()
         self.browser = CodexUsageBrowser(self.chrome_path, self.set_status) if self.chrome_path else None
+        self.json_provider = json_usage_provider.JsonUsageProvider()
         self.refresh_in_progress = False
         self.current_balance = Balance()
         self.history = HistoryStore.load()
@@ -2173,39 +2175,59 @@ class CodexBalanceWidget:
 
         self.refresh_in_progress = True
         try:
-            if not self.browser:
+            json_result = await self.json_provider.fetch()
+
+            if json_result.status == "ok":
+                outcome = plan_fetch_outcome(
+                    json_status="ok",
+                    json_fields=json_result.fields,
+                    json_error=None,
+                    chrome_attempted=False,
+                    chrome_status=None,
+                    chrome_error=None,
+                    chrome_text=None,
+                    has_existing_data=self.current_balance.has_usage_data,
+                    language=self.language,
+                )
+                self.last_fetch_status = "ok"
+                self.last_fetch_error = None
+                self.last_usage_text_length = None
+            elif not self.browser:
+                outcome = plan_fetch_outcome(
+                    json_status="error",
+                    json_fields=None,
+                    json_error=json_result.error,
+                    chrome_attempted=False,
+                    chrome_status="chrome_not_found",
+                    chrome_error=None,
+                    chrome_text=None,
+                    has_existing_data=self.current_balance.has_usage_data,
+                    language=self.language,
+                )
                 self.last_fetch_status = "chrome_not_found"
                 self.last_fetch_error = tr(self.language, "Google Chrome not found", "Google Chrome не найден")
-                self.set_status(tr(self.language, "Google Chrome not found. Set CHROME_PATH.", "Google Chrome не найден. Укажите CHROME_PATH."))
-                return
-
-            result = await self.browser.fetch()
-            self.last_fetch_status = result.status
-            self.last_fetch_error = result.error
-            self.last_usage_text_length = len(result.text) if result.text else None
-            if result.status != "ok" or not result.text:
-                if self.current_balance.has_usage_data:
-                    self.set_status(tr(self.language, "Showing last saved data · refresh failed", "Показаны последние данные · обновить не удалось"))
-                elif result.status == "browser_error":
-                    self.set_status(tr(self.language, "Chrome failed to start. See widget_launch.log", "Chrome не запустился. Подробности в widget_launch.log"))
-                elif result.status == "login_required":
-                    self.set_status(tr(self.language, "Sign in to ChatGPT. Click Refresh to open Chrome.", "Нужен вход в ChatGPT. Нажмите Обновить, чтобы открыть Chrome."))
-                else:
-                    self.set_status(tr(self.language, "Usage data timed out. Click Refresh.", "Не дождался данных Usage. Нажмите Обновить."))
-                return
-
-            balance = BalanceParser.parse(result.text)
-            if balance.has_usage_data:
-                self.last_successful_update = datetime.now()
-                self.update_balance_ui(balance)
-                if is_weekly_limit_exhausted(balance):
-                    self.set_status(tr(self.language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан"))
-                else:
-                    self.set_status(tr(self.language, "Data is up to date", "Данные актуальны"))
-            elif self.current_balance.has_usage_data:
-                self.set_status(tr(self.language, "Showing last saved data · new data not recognized", "Показаны последние данные · новые не распознаны"))
             else:
-                self.set_status(tr(self.language, "Data not recognized", "Данные не распознаны"))
+                result = await self.browser.fetch()
+                self.last_fetch_status = result.status
+                self.last_fetch_error = result.error
+                self.last_usage_text_length = len(result.text) if result.text else None
+                outcome = plan_fetch_outcome(
+                    json_status="error",
+                    json_fields=None,
+                    json_error=json_result.error,
+                    chrome_attempted=True,
+                    chrome_status=result.status,
+                    chrome_error=result.error,
+                    chrome_text=result.text,
+                    has_existing_data=self.current_balance.has_usage_data,
+                    language=self.language,
+                )
+
+            if outcome.balance is not None:
+                self.last_successful_update = datetime.now()
+                self.update_balance_ui(outcome.balance)
+            self.set_status(outcome.status_message)
+            write_log(outcome.log_line)
         finally:
             self.refresh_in_progress = False
 
