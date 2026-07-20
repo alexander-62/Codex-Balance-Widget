@@ -30,20 +30,21 @@ key-decisions:
 requirements-completed: [PROBE-01, PROBE-03]
 
 # Metrics
-duration: 3min
-completed: 2026-07-17
+duration: ~10min
+completed: 2026-07-20
 ---
 
 # Phase 1 Plan 2: Live probe run, fixture capture, and human review Summary
 
-**Live `GET https://chatgpt.com/backend-api/wham/usage` returned HTTP 200; redacted fixture `wham_usage_fixture.json` captured with zero schema drift from RESEARCH; Task 2 human-verify checkpoint reached and awaiting user confirmation.**
+**Live `GET https://chatgpt.com/backend-api/wham/usage` returned HTTP 200; redacted fixture `wham_usage_fixture.json` captured with zero schema drift from RESEARCH; user confirmed a second independent live run's extracted fields (weekly 80%, credits 0, five_hour absent) match the Codex balance widget exactly — Task 2 approved.**
 
 ## Performance
 
-- **Duration:** ~3 min (Task 1 only; Task 2 is a pending human checkpoint)
+- **Duration:** ~10 min (Task 1 automated run + Task 2 human verification round-trip)
 - **Started:** 2026-07-17T18:01:44+03:00 (after 01-01 completion commit)
 - **Completed (Task 1):** 2026-07-17T18:03:54+03:00
-- **Tasks:** 1/2 (Task 2 is `checkpoint:human-verify`, awaiting user response)
+- **Completed (Task 2, user approval received):** 2026-07-20
+- **Tasks:** 2/2
 - **Files modified:** 1 (new)
 
 ## Accomplishments
@@ -54,12 +55,14 @@ completed: 2026-07-17
 - `git status --porcelain` on the six locked widget files (`codex_balance_widget_chrome.py`, `codex_balance_widget_launcher.pyw`, `install.bat`, `run.bat`, `run_hidden.vbs`, `requirements.txt`) returned empty — confirmed untouched.
 - Overall `git status --porcelain` showed only `?? wham_usage_fixture.json` — no modified files outside `.planning/`.
 - Schema comparison against `01-RESEARCH.md` Endpoint Contract: **zero drift**. Same top-level keys, same `rate_limit.primary_window` (weekly, `limit_window_seconds: 604800`) / `secondary_window: null` shape, same `credits`/`spend_control`/`rate_limit_reset_credits` structure. Only the live numeric values differ (`used_percent: 31` this run vs `16` in RESEARCH's earlier capture, different `reset_after_seconds`) — expected, not drift.
+- **Task 2 (human review) approved by the user.** The user ran `py -3 probe_wham_usage.py --no-fixture` directly (a third independent live run) and compared the printed `Extracted fields (Balance)` block against a screenshot of the current Chrome-scraping widget: weekly 80% remaining (used 20%), weekly reset `2026-07-26 14:45`, credits `0`, `five_hour` absent — all four fields matched the widget exactly. The user separately re-verified the fixture redaction (`rate_limit` present; `email`/`user_id`/`account_id`/`spend_control.individual_limit` all `<redacted>`; no `eyJ`/`@` substrings) and confirmed `git status` showed only the expected new files.
 
 ## Task Commits
 
 1. **Task 1: Живой запуск пробы, фикстура и проверка чистоты git** - `500e8d9` (feat)
+2. **Task 2: Ревью вывода пробы и фикстуры** - checkpoint, no file changes; approved by user (response: "approved")
 
-**Plan metadata:** (pending — will be added after Task 2 checkpoint resolves)
+**Plan metadata:** `e6b8b36` (docs: Task 1 interim summary), final commit below
 
 ## Files Created/Modified
 
@@ -83,15 +86,22 @@ None - the probe used the existing `~/.codex/auth.json` maintained by Codex CLI;
 
 ## Next Phase Readiness
 
-Task 1 (the only automatable/auto task in this plan) is complete and committed (`500e8d9`). Task 2 is a `checkpoint:human-verify` gate (`gate="blocking"`) — it does not modify files and cannot be auto-approved by an executor agent; it requires the actual user to run `py -3 probe_wham_usage.py --no-fixture`, review the printed fields against the current widget, inspect `wham_usage_fixture.json` for redaction, and confirm `git status` cleanliness, then respond "approved" (or describe issues).
+Both tasks complete. Live endpoint access, field extraction, and fixture redaction are proven end-to-end and independently confirmed by the user against the actual widget UI. All five phase Success Criteria are closed:
 
-This plan is paused at the Task 2 checkpoint pending that human response; the orchestrator must present the checkpoint to the real user and resume/re-invoke to close out the plan (mark requirement PROBE-03 complete, add the final `docs` metadata commit) once approval is received.
+1. Live status + pretty JSON — `HTTP status: 200` printed on every run (Task 1, and the user's independent Task 2 run).
+2. Extracted fields / honest list of missing ones — weekly %, credits, weekly reset printed and matched to the widget; `five_hour` correctly reported as absent (not an error) on this plus-plan account.
+3. Redacted fixture — `wham_usage_fixture.json` committed, passes automated post-check and manual user inspection.
+4. Diagnostics without traceback — covered by plan 01-01 (`ProbeError` branches), re-confirmed indirectly by the clean live runs in this plan.
+5. Git shows only new files — verified twice (Task 1 automated check + user's own `git status` in Task 2).
+
+`wham_usage_fixture.json` is ready to serve as the reference fixture for Phase 2's widget JSON-provider integration and parser tests. No blockers.
 
 ## Self-Check: PASSED
 
 - FOUND: wham_usage_fixture.json
 - FOUND commit: 500e8d9 (feat: Task 1 live fixture capture)
+- FOUND commit: e6b8b36 (docs: Task 1 interim summary)
 
 ---
 *Phase: 01-json-endpoint-probe*
-*Completed: 2026-07-17 (Task 1 only; Task 2 checkpoint pending)*
+*Completed: 2026-07-20 (both tasks complete, Task 2 approved by user)*
