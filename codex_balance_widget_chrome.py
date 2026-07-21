@@ -2182,7 +2182,14 @@ class CodexBalanceWidget:
         try:
             json_result = await self.json_provider.fetch()
 
+            # A JSON "ok" status only counts as a real success if it actually carried
+            # recognizable usage fields; otherwise it must fall through to the Chrome
+            # fallback below (CR-01), just like a genuine JSON fetch error would.
+            json_ok_with_data = False
             if json_result.status == "ok":
+                json_ok_with_data = build_balance_from_json_fields(json_result.fields or {}).has_usage_data
+
+            if json_ok_with_data:
                 outcome = plan_fetch_outcome(
                     json_status="ok",
                     json_fields=json_result.fields,
@@ -2198,10 +2205,15 @@ class CodexBalanceWidget:
                 self.last_fetch_error = None
                 self.last_usage_text_length = None
             elif not self.browser:
+                json_error = (
+                    json_result.error
+                    if json_result.status != "ok"
+                    else "json response had no recognizable usage fields"
+                )
                 outcome = plan_fetch_outcome(
                     json_status="error",
                     json_fields=None,
-                    json_error=json_result.error,
+                    json_error=json_error,
                     chrome_attempted=False,
                     chrome_status="chrome_not_found",
                     chrome_error=None,
@@ -2216,10 +2228,15 @@ class CodexBalanceWidget:
                 self.last_fetch_status = result.status
                 self.last_fetch_error = result.error
                 self.last_usage_text_length = len(result.text) if result.text else None
+                json_error = (
+                    json_result.error
+                    if json_result.status != "ok"
+                    else "json response had no recognizable usage fields"
+                )
                 outcome = plan_fetch_outcome(
                     json_status="error",
                     json_fields=None,
-                    json_error=json_result.error,
+                    json_error=json_error,
                     chrome_attempted=True,
                     chrome_status=result.status,
                     chrome_error=result.error,
