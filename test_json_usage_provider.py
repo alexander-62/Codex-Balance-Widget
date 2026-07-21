@@ -66,6 +66,23 @@ class TestJsonUsageProviderFetch(unittest.IsolatedAsyncioTestCase):
 
     @patch("probe_wham_usage.fetch_usage")
     @patch("probe_wham_usage.load_tokens")
+    async def test_unexpected_exception_becomes_error_result(self, mock_load_tokens, mock_fetch_usage):
+        # Regression test for the broad `except Exception` fallback in
+        # _fetch_with_retry (02-REVIEW WR-02): a non-ProbeError exception
+        # (schema/encoding/IO surprise) must be converted to an error
+        # JsonFetchResult instead of propagating and crashing the caller,
+        # and must not be retried (treated as non-retryable).
+        mock_load_tokens.return_value = ("tok", None)
+        mock_fetch_usage.side_effect = AttributeError("'str' object has no attribute 'get'")
+        provider = JsonUsageProvider(retry_delay=0)
+        result = await provider.fetch()
+        self.assertEqual(result.status, "error")
+        self.assertIn("AttributeError", result.error)
+        self.assertFalse(result.retried)
+        self.assertEqual(mock_fetch_usage.call_count, 1)
+
+    @patch("probe_wham_usage.fetch_usage")
+    @patch("probe_wham_usage.load_tokens")
     async def test_retryable_error_then_success(self, mock_load_tokens, mock_fetch_usage):
         mock_load_tokens.return_value = ("tok", None)
         mock_fetch_usage.side_effect = [
