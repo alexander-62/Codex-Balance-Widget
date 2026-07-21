@@ -39,6 +39,16 @@ Plans:
 - [x] 01-01-PLAN.md — Проба probe_wham_usage.py (чистое ядро + HTTP + CLI-диагностика) и unit-тесты test_probe_wham_usage.py (wave 1, autonomous)
 - [x] 01-02-PLAN.md — Живой запуск: HTTP 200, фикстура wham_usage_fixture.json с редакцией, git-чистота + human-verify (wave 2, checkpoint)
 
+### Phase 01.1: Address Phase 1 tech debt: redaction post-check, malformed-payload AttributeError, main() exception scope (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 1
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 01.1 to break down)
+
 ### Phase 2: JSON provider integration
 
 **Goal**: Виджет получает данные через JSON-эндпоинт как основной источник; Chrome-скрейпинг остаётся фолбэком до подтверждения стабильности.
