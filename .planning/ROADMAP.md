@@ -15,7 +15,7 @@
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: JSON endpoint probe** - Отдельный тестовый скрипт: auth.json → wham/usage → структура ответа. Рабочий код виджета не изменяется. (completed 2026-07-20)
-- [ ] **Phase 2: JSON provider integration** - Встроить JSON-источник в виджет с фолбэком на Chrome-скрейпинг.
+- [x] **Phase 2: JSON provider integration** - Встроить JSON-источник в виджет с фолбэком на Chrome-скрейпинг. (completed 2026-07-21)
 
 ## Phase Details
 
@@ -59,4 +59,4 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-03-PLAN.md — Врезка в fetch_once: JSON основной источник + Chrome-фолбэк + лог источника, живая проверка (wave 2, checkpoint)
+- [x] 02-03-PLAN.md — Врезка в fetch_once: JSON основной источник + Chrome-фолбэк + лог источника, живая проверка (wave 2, checkpoint)
