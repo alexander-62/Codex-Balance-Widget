@@ -44,10 +44,10 @@ Plans:
 **Goal:** Close CR-01 (stdout redaction lacks the redaction_clean() post-check that write_fixture() has), CR-02 (collect_windows() crashes on non-dict rate_limit/additional_rate_limits entries), and WR-01 (main() only catches ProbeError) in probe_wham_usage.py, exactly as identified in 01-REVIEW.md / 01-VERIFICATION.md.
 **Requirements**: tech-debt-closure
 **Depends on:** Phase 1
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 01.1-01-PLAN.md — Regression tests + fixes for CR-01/CR-02/WR-01 in probe_wham_usage.py (wave 1, autonomous)
+- [x] 01.1-01-PLAN.md — Regression tests + fixes for CR-01/CR-02/WR-01 in probe_wham_usage.py (wave 1, autonomous)
 
 ### Phase 2: JSON provider integration
 
