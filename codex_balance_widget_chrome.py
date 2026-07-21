@@ -557,11 +557,16 @@ def plan_fetch_outcome(
     """
     if json_status == "ok":
         balance = build_balance_from_json_fields(json_fields or {})
-        if is_weekly_limit_exhausted(balance):
-            message = tr(language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан")
-        else:
-            message = tr(language, "Data is up to date", "Данные актуальны")
-        return FetchOutcome("json", balance, message, "Balance updated (source: json)")
+        if balance.has_usage_data:
+            if is_weekly_limit_exhausted(balance):
+                message = tr(language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан")
+            else:
+                message = tr(language, "Data is up to date", "Данные актуальны")
+            return FetchOutcome("json", balance, message, "Balance updated (source: json)")
+        # Valid JSON but no recognizable usage fields -- treat like a JSON error so the
+        # Chrome-fallback / "keep last good data" logic below still applies.
+        json_status = "error"
+        json_error = "json response had no recognizable usage fields"
 
     if not chrome_attempted:
         message = tr(language, "Google Chrome not found. Set CHROME_PATH.", "Google Chrome не найден. Укажите CHROME_PATH.")
