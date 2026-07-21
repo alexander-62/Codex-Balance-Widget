@@ -2238,7 +2238,12 @@ class CodexBalanceWidget:
 
     async def refresh_loop(self) -> None:
         while True:
-            await self.fetch_once()
+            try:
+                await self.fetch_once()
+            except Exception as exc:
+                write_log("refresh_loop: unexpected error, continuing:\n" + "".join(
+                    traceback.format_exception(type(exc), exc, exc.__traceback__)
+                ))
             await asyncio.sleep(self.refresh_seconds)
 
     def on_close(self) -> None:

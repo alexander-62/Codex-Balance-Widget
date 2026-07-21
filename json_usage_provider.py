@@ -61,6 +61,8 @@ class JsonUsageProvider:
         except probe_wham_usage.ProbeError as exc:
             if not exc.retryable:
                 return JsonFetchResult("error", error=str(exc))
+        except Exception as exc:  # unexpected schema/encoding/IO error - do not crash the loop
+            return JsonFetchResult("error", error=f"{type(exc).__name__}: {exc}")
 
         await asyncio.sleep(self.retry_delay)
         try:
@@ -70,6 +72,8 @@ class JsonUsageProvider:
             )
         except probe_wham_usage.ProbeError as exc2:
             return JsonFetchResult("error", error=str(exc2), retried=True)
+        except Exception as exc2:  # unexpected schema/encoding/IO error - do not crash the loop
+            return JsonFetchResult("error", error=f"{type(exc2).__name__}: {exc2}", retried=True)
 
     async def _fetch_payload(self, access_token: str, account_id: str | None) -> dict:
         _, payload = await asyncio.to_thread(
