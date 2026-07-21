@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Awaiting next milestone
-last_updated: "2026-07-21T11:42:39.687Z"
-last_activity: 2026-07-21 — Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: Shared usage-provider core
+status: planning
+last_updated: "2026-07-21T15:21:58.125Z"
+last_activity: 2026-07-21
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/ROADMAP.md (updated 2026-07-17)
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-21 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-21 — Milestone v1.1 started
 
 ## Accumulated Context
 
