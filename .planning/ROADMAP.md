@@ -41,13 +41,13 @@ Plans:
 
 ### Phase 01.1: Address Phase 1 tech debt: redaction post-check, malformed-payload AttributeError, main() exception scope (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** Close CR-01 (stdout redaction lacks the redaction_clean() post-check that write_fixture() has), CR-02 (collect_windows() crashes on non-dict rate_limit/additional_rate_limits entries), and WR-01 (main() only catches ProbeError) in probe_wham_usage.py, exactly as identified in 01-REVIEW.md / 01-VERIFICATION.md.
+**Requirements**: tech-debt-closure
 **Depends on:** Phase 1
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 01.1 to break down)
+- [ ] 01.1-01-PLAN.md — Regression tests + fixes for CR-01/CR-02/WR-01 in probe_wham_usage.py (wave 1, autonomous)
 
 ### Phase 2: JSON provider integration
 
