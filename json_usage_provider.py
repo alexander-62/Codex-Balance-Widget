@@ -55,25 +55,38 @@ class JsonUsageProvider:
         return await self._fetch_with_retry(access_token, account_id)
 
     async def _fetch_with_retry(self, access_token: str, account_id: str | None) -> JsonFetchResult:
-        try:
-            payload = await self._fetch_payload(access_token, account_id)
-            return JsonFetchResult("ok", fields=probe_wham_usage.extract_fields(payload))
-        except probe_wham_usage.ProbeError as exc:
-            if not exc.retryable:
-                return JsonFetchResult("error", error=str(exc))
-        except Exception as exc:  # unexpected schema/encoding/IO error - do not crash the loop
-            return JsonFetchResult("error", error=f"{type(exc).__name__}: {exc}")
+        # At most 2 attempts: an immediate try, then (for retryable failures
+        # only) one retry after a short delay. Both attempts share this loop
+        # so a future fix only has to be applied in one place (see 02-REVIEW
+        # WR-01). `first_error` keeps the first attempt's failure message
+        # around so it isn't silently discarded if the retry also fails
+        # (02-REVIEW WR-02).
+        first_error: str | None = None
+        for attempt in range(2):
+            if attempt == 1:
+                await asyncio.sleep(self.retry_delay)
+            try:
+                payload = await self._fetch_payload(access_token, account_id)
+                return JsonFetchResult(
+                    "ok", fields=probe_wham_usage.extract_fields(payload), retried=attempt == 1
+                )
+            except probe_wham_usage.ProbeError as exc:
+                error_text = str(exc)
+                retryable = exc.retryable
+            except Exception as exc:  # unexpected schema/encoding/IO error - do not crash the loop
+                error_text = f"{type(exc).__name__}: {exc}"
+                retryable = False
 
-        await asyncio.sleep(self.retry_delay)
-        try:
-            payload = await self._fetch_payload(access_token, account_id)
-            return JsonFetchResult(
-                "ok", fields=probe_wham_usage.extract_fields(payload), retried=True
-            )
-        except probe_wham_usage.ProbeError as exc2:
-            return JsonFetchResult("error", error=str(exc2), retried=True)
-        except Exception as exc2:  # unexpected schema/encoding/IO error - do not crash the loop
-            return JsonFetchResult("error", error=f"{type(exc2).__name__}: {exc2}", retried=True)
+            if attempt == 0 and retryable:
+                first_error = error_text
+                continue
+            if first_error is not None:
+                error_text = f"{first_error}; retry: {error_text}"
+            return JsonFetchResult("error", error=error_text, retried=attempt == 1)
+
+        # Unreachable: attempt 0 either returns or `continue`s into attempt 1,
+        # and attempt 1 always returns. Kept only to satisfy static analysis.
+        return JsonFetchResult("error", error=first_error, retried=True)
 
     async def _fetch_payload(self, access_token: str, account_id: str | None) -> dict:
         _, payload = await asyncio.to_thread(
