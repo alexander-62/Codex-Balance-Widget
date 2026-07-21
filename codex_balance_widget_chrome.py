@@ -1890,7 +1890,18 @@ class CodexBalanceWidget:
         if self.refresh_in_progress:
             self.set_status(tr(self.language, "Refresh already in progress...", "Обновление уже идет..."))
             return
-        asyncio.run_coroutine_threadsafe(self.fetch_once(), self.loop)
+        future = asyncio.run_coroutine_threadsafe(self.fetch_once(), self.loop)
+        future.add_done_callback(self._log_manual_refresh_exception)
+
+    def _log_manual_refresh_exception(self, future: "asyncio.Future") -> None:
+        try:
+            exc = future.exception()
+        except asyncio.CancelledError:
+            return
+        if exc is not None:
+            write_log("manual_refresh: unexpected error:\n" + "".join(
+                traceback.format_exception(type(exc), exc, exc.__traceback__)
+            ))
 
     def open_usage_site(self) -> None:
         webbrowser.open(CODEX_USAGE_URL, new=2)
