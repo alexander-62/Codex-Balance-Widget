@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-last_updated: 2026-07-21T11:40:24.743Z
-last_activity: 2026-07-21 -- Phase 01.1 execution started
+status: Awaiting next milestone
+last_updated: "2026-07-21T11:42:39.687Z"
+last_activity: 2026-07-21 — Milestone v1.0 completed and archived
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
   completed_plans: 6
-  percent: 67
-stopped_at: Phase 01.1 complete (1/1) — ready to discuss Phase 02
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +24,10 @@ See: .planning/ROADMAP.md (updated 2026-07-17)
 
 ## Current Position
 
-Phase: 02
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-21
-
-Progress: [░░░░░░░░░░] 0%
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-21 — Milestone v1.0 completed and archived
 
 ## Accumulated Context
 
@@ -50,3 +47,16 @@ Progress: [░░░░░░░░░░] 0%
 ### Overrides
 
 - Phase 2 planning: decision coverage gate flagged D-06 (метрика стабильности для удаления Chrome-пути НЕ фиксируется в этой фазе) как непокрытую ни одним планом. Оператор подтвердил "Продолжить как есть" — D-06 корректно отсутствует в планах, т.к. решение описывает NOT-в-скоупе для Phase 2 (см. 02-CONTEXT.md D-06). verify-phase может пере-поднять это при необходимости.
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone v1.0 close on 2026-07-21:
+
+| Category | Item | Status |
+|----------|------|--------|
+| todo | claude-widget-tooltip-and-401-retry.md | pending, high priority — out of this milestone's scope (claude_balance_widget.py, separate project) |
+| todo | codex-5h-none-partial-parse.md | pending, high priority — live parsing bug, candidate for v1.1 milestone |
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
