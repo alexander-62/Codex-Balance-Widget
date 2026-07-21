@@ -140,6 +140,26 @@ class TestPlanFetchOutcome(unittest.TestCase):
         )
         self.assertIn("source: json", outcome.log_line)
 
+    def test_json_ok_empty_fields_falls_back_not_json_source(self):
+        # CR-01 regression: a structurally-valid JSON body with no
+        # recognizable usage fields (e.g. `{}`, or a schema change) must not
+        # be treated as a successful "json" source update -- it should fall
+        # through the same path as a JSON error.
+        outcome = plan_fetch_outcome(
+            json_status="ok",
+            json_fields={},
+            json_error=None,
+            chrome_attempted=False,
+            chrome_status=None,
+            chrome_error=None,
+            chrome_text=None,
+            has_existing_data=True,
+            language=self.LANGUAGE,
+        )
+        self.assertNotEqual(outcome.source, "json")
+        self.assertEqual(outcome.source, "none")
+        self.assertIsNone(outcome.balance)
+
     def test_json_error_chrome_not_attempted(self):
         outcome = plan_fetch_outcome(
             json_status="error",
