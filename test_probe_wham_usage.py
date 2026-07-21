@@ -8,6 +8,7 @@ tempfile.TemporaryDirectory.
 from __future__ import annotations
 
 import base64
+import contextlib
 import io
 import json
 import tempfile
@@ -88,6 +89,36 @@ class TestWindows(unittest.TestCase):
     def test_pick_window_tolerance(self):
         windows = [{"limit_window_seconds": 17500}]
         self.assertIsNotNone(probe_wham_usage.pick_window(windows, 18000))
+
+    def test_collect_windows_non_dict_rate_limit(self):
+        # rate_limit is truthy but not a dict — must be treated as absent
+        # instead of raising AttributeError on rate_limit.get(slot) (CR-02).
+        payload = {"rate_limit": "not-a-dict"}
+        self.assertEqual(probe_wham_usage.collect_windows(payload), [])
+
+    def test_collect_windows_non_dict_additional_rate_limit_entry(self):
+        # A malformed additional_rate_limits[] entry (truthy, non-dict) must
+        # be skipped instead of raising AttributeError on
+        # (extra or {}).get("rate_limit") (CR-02); the valid entry alongside
+        # it must still be collected.
+        payload = {
+            "additional_rate_limits": [
+                "not-a-dict",
+                {
+                    "limit_name": "gpt-5-pro",
+                    "rate_limit": {
+                        "primary_window": {
+                            "limit_window_seconds": 18000,
+                            "used_percent": 1,
+                            "reset_at": 3,
+                        }
+                    },
+                },
+            ]
+        }
+        windows = probe_wham_usage.collect_windows(payload)
+        self.assertEqual(len(windows), 1)
+        self.assertEqual(windows[0]["limit_name"], "gpt-5-pro")
 
 
 class TestExtract(unittest.TestCase):
@@ -347,6 +378,45 @@ class TestFetchUsageErrorClassification(unittest.TestCase):
         status, payload = probe_wham_usage.fetch_usage("tok", None, 5)
         self.assertEqual(status, 200)
         self.assertEqual(payload, {"ok": True})
+
+
+class TestMainErrorHandling(unittest.TestCase):
+    @patch("probe_wham_usage.fetch_usage")
+    @patch("probe_wham_usage.load_tokens")
+    def test_main_stdout_redaction_post_check_blocks_leak(
+        self, mock_load_tokens, mock_fetch_usage
+    ):
+        # "weird_field" is outside the redact() denylist and doesn't
+        # contain "token", so the eyJ-looking value survives redact() —
+        # main()'s stdout print path must apply the same redaction_clean()
+        # post-check write_fixture() already has and refuse to print (CR-01).
+        mock_load_tokens.return_value = ("tok", None)
+        mock_fetch_usage.return_value = (
+            200,
+            {"weird_field": "eyJhbGciOiJIUzI1NiJ9"},
+        )
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            result = probe_wham_usage.main(["--no-fixture"])
+        self.assertEqual(result, 1)
+        self.assertNotIn("eyJhbGciOiJIUzI1NiJ9", buf.getvalue())
+
+    @patch("probe_wham_usage.fetch_usage")
+    @patch("probe_wham_usage.load_tokens")
+    def test_main_catches_non_probeerror_exception(
+        self, mock_load_tokens, mock_fetch_usage
+    ):
+        # Any non-ProbeError exception raised inside main()'s try block
+        # (e.g. a KeyError from fetch_usage) must still be converted to the
+        # single clean-diagnostic contract — no raw traceback on stdout
+        # unless --debug (WR-01).
+        mock_load_tokens.return_value = ("tok", None)
+        mock_fetch_usage.side_effect = KeyError("boom")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            result = probe_wham_usage.main(["--no-fixture"])
+        self.assertEqual(result, 1)
+        self.assertNotIn("Traceback", buf.getvalue())
 
 
 if __name__ == "__main__":
