@@ -8,16 +8,21 @@ which is fine and does not start a browser).
 
 from __future__ import annotations
 
+import asyncio
 import unittest
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from codex_balance_widget_chrome import (
     Balance,
+    CodexBalanceWidget,
+    FetchResult,
     build_balance_from_json_fields,
     parse_reset_datetime,
     plan_fetch_outcome,
     tr,
 )
+from json_usage_provider import JsonFetchResult
 
 CHROME_TEXT_WITH_USAGE = (
     "5-hour usage limit 87% remaining Weekly usage limit 42% remaining Credits remaining 12"
@@ -292,6 +297,103 @@ class TestPlanFetchOutcome(unittest.TestCase):
             )
         )
         self.assertTrue(outcome.status_message.endswith(tr(self.LANGUAGE, "Chrome fallback", "Chrome-фолбэк")))
+
+
+class TestFetchOnceJsonOkNoUsageDataFallback(unittest.TestCase):
+    """Integration-level regression test for WR-03 / CR-01.
+
+    `TestPlanFetchOutcome` above only exercises the pure `plan_fetch_outcome()`
+    decision function -- it never touches `fetch_once()`'s own glue code,
+    which is where the original CR-01 defect actually lived (a hardcoded
+    `chrome_attempted=False` on any JSON "ok" status, regardless of whether
+    the JSON body had usable fields). These tests instantiate
+    `CodexBalanceWidget` via `__new__` (skipping `__init__`, so no Tk root,
+    event loop thread, or Chrome discovery is needed) and drive `fetch_once()`
+    directly with a mocked `json_provider` and `browser`, so a future
+    regression to the `json_ok_with_data` check in `fetch_once()` itself
+    (e.g. reverting it back to a bare `json_result.status == "ok"` check)
+    would fail these tests even though `plan_fetch_outcome()` remains
+    correct and `TestPlanFetchOutcome` keeps passing.
+    """
+
+    LANGUAGE = "en"
+
+    def _make_widget(self, *, json_result: JsonFetchResult, browser_fetch_result: FetchResult | None):
+        widget = CodexBalanceWidget.__new__(CodexBalanceWidget)
+        widget.refresh_in_progress = False
+        widget.language = self.LANGUAGE
+        widget.current_balance = Balance()
+        widget.last_successful_update = None
+        widget.last_fetch_status = None
+        widget.last_fetch_error = None
+        widget.last_usage_text_length = None
+        widget.json_provider = MagicMock()
+        widget.json_provider.fetch = AsyncMock(return_value=json_result)
+        if browser_fetch_result is not None:
+            widget.browser = MagicMock()
+            widget.browser.fetch = AsyncMock(return_value=browser_fetch_result)
+        else:
+            widget.browser = None
+        widget.set_status = MagicMock()
+        widget.update_balance_ui = MagicMock()
+        return widget
+
+    @patch("codex_balance_widget_chrome.write_log")
+    def test_json_ok_empty_fields_with_browser_attempts_chrome_fallback(self, mock_write_log):
+        # CR-01 regression: JSON reports "ok" but with no recognizable usage
+        # fields, and a browser fallback IS configured -- fetch_once() must
+        # actually await self.browser.fetch() instead of short-circuiting on
+        # the JSON "ok" status alone.
+        json_result = JsonFetchResult("ok", fields={})
+        browser_result = FetchResult("not_ready")
+        widget = self._make_widget(json_result=json_result, browser_fetch_result=browser_result)
+
+        asyncio.run(widget.fetch_once())
+
+        widget.browser.fetch.assert_awaited_once()
+        self.assertNotEqual(widget.last_fetch_status, "chrome_not_found")
+        mock_write_log.assert_called_once()
+
+    @patch("codex_balance_widget_chrome.write_log")
+    def test_json_ok_empty_fields_without_browser_reports_chrome_not_found(self, mock_write_log):
+        # Same JSON-ok-but-empty input, but no browser configured at all --
+        # fetch_once() should fall into the "Chrome not found" leg (which
+        # only makes sense once the JSON "ok" result has already been
+        # correctly treated as not-a-real-success).
+        json_result = JsonFetchResult("ok", fields={})
+        widget = self._make_widget(json_result=json_result, browser_fetch_result=None)
+
+        asyncio.run(widget.fetch_once())
+
+        self.assertEqual(widget.last_fetch_status, "chrome_not_found")
+        self.assertEqual(
+            widget.last_fetch_error,
+            tr(self.LANGUAGE, "Google Chrome not found", "Google Chrome не найден"),
+        )
+        mock_write_log.assert_called_once()
+
+    @patch("codex_balance_widget_chrome.write_log")
+    def test_json_ok_with_usage_data_skips_chrome_fallback(self, mock_write_log):
+        # Sanity check on the other side of the branch: a genuinely usable
+        # JSON payload must NOT trigger the Chrome fallback, even when a
+        # browser is configured.
+        json_result = JsonFetchResult(
+            "ok",
+            fields={
+                "five_hour_percent": "50",
+                "weekly_percent": "50",
+                "credits": "10",
+                "five_hour_reset_text": None,
+                "weekly_reset_text": None,
+            },
+        )
+        browser_result = FetchResult("not_ready")
+        widget = self._make_widget(json_result=json_result, browser_fetch_result=browser_result)
+
+        asyncio.run(widget.fetch_once())
+
+        widget.browser.fetch.assert_not_awaited()
+        self.assertEqual(widget.last_fetch_status, "ok")
 
 
 if __name__ == "__main__":
