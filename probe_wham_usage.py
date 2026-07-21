@@ -420,7 +420,13 @@ def main(argv: list[str] | None = None) -> int:
             traceback.print_exc()
         return 1
     except Exception as exc:
-        print(f"Непредвиденная ошибка: {exc}")
+        message = f"Непредвиденная ошибка: {exc}"
+        if not redaction_clean(message):
+            message = (
+                "Непредвиденная ошибка (сообщение скрыто по соображениям "
+                "безопасности)."
+            )
+        print(message)
         if args.debug:
             traceback.print_exc()
         return 1
