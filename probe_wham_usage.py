@@ -135,17 +135,23 @@ def collect_windows(payload: dict) -> list[dict]:
     with limit_name). Defensive against nulls/missing keys at every level.
     """
     out: list[dict] = []
-    rate_limit = payload.get("rate_limit") or {}
+    rate_limit = payload.get("rate_limit")
+    if not isinstance(rate_limit, dict):
+        rate_limit = {}
     for slot in ("primary_window", "secondary_window"):
         window = rate_limit.get(slot)
         if isinstance(window, dict):
             out.append(window)
     for extra in payload.get("additional_rate_limits") or []:
-        inner = (extra or {}).get("rate_limit") or {}
+        if not isinstance(extra, dict):
+            continue
+        inner = extra.get("rate_limit")
+        if not isinstance(inner, dict):
+            inner = {}
         for slot in ("primary_window", "secondary_window"):
             window = inner.get(slot)
             if isinstance(window, dict):
-                out.append({**window, "limit_name": (extra or {}).get("limit_name")})
+                out.append({**window, "limit_name": extra.get("limit_name")})
     return out
 
 
@@ -378,7 +384,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"HTTP status: {status}")
 
         redacted_payload = redact(payload)
-        print(json.dumps(redacted_payload, ensure_ascii=False, indent=2))
+        text = json.dumps(redacted_payload, ensure_ascii=False, indent=2)
+        if not redaction_clean(text):
+            raise ProbeError(
+                "Редакция вывода не прошла пост-проверку (eyJ/@) — вывод скрыт."
+            )
+        print(text)
 
         fields = extract_fields(payload)
         print("Extracted fields (Balance):")
@@ -405,6 +416,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except ProbeError as exc:
         print(str(exc))
+        if args.debug:
+            traceback.print_exc()
+        return 1
+    except Exception as exc:
+        print(f"Непредвиденная ошибка: {exc}")
         if args.debug:
             traceback.print_exc()
         return 1
