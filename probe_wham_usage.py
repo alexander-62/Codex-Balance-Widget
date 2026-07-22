@@ -12,8 +12,11 @@ redacted fixture file.
 The access token is kept out of stdout, logs and any error message,
 including under --debug.
 
-Only stdlib is used: json, os, sys, base64, argparse, urllib.request,
-urllib.error, datetime, pathlib.
+Only stdlib is used directly by this module (json, os, sys, base64,
+argparse, urllib.request, urllib.error, datetime, pathlib), plus the
+sibling `usage_widget_common` package (also stdlib-only) reached via a
+sys.path bootstrap — see the top of this file. That sibling repo must be
+cloned next to this one (see README) or the bootstrap raises SystemExit.
 """
 
 from __future__ import annotations

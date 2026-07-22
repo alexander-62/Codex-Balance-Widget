@@ -12,9 +12,13 @@ fallback signal" policy (see 02-CONTEXT.md D-02/D-03):
   error, timeout) -> exactly one retry after a short delay, then give
   up regardless of the outcome (D-03).
 
-Only stdlib is used (asyncio, dataclasses) plus probe_wham_usage itself.
-No Tk/UI dependency — this module is safe to import from any caller,
-sync or async, without side effects on import.
+Only stdlib is used directly by this module (asyncio, dataclasses) plus
+probe_wham_usage itself and the sibling `usage_widget_common` package
+(also stdlib-only) reached via a sys.path bootstrap — see the top of this
+file. That sibling repo must be cloned next to this one (see README) or
+the bootstrap raises SystemExit. No Tk/UI dependency, but note that
+importing this module DOES have a side effect: it mutates sys.path (and
+will raise SystemExit if usage_widget_common is missing).
 """
 
 from __future__ import annotations
