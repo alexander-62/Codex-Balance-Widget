@@ -56,7 +56,11 @@ Full details: [.planning/milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
   4. `usage_widget_common.tray.build_tray_tooltip(...)` is parameterized so Codex's 3-line tooltip (5h + weekly + credits) and Claude's simpler 2-line tooltip (5h + weekly) both render correctly from the same function, each truncated to 127 chars.
   5. `usage_widget_common.instance.start_single_instance_listener(port, on_activate)` and `notify_running_instance(port)` are importable from the shared package and reproduce both widgets' existing local-loopback-socket behavior — a second launch attempt on the same port raises the running instance's window via `on_activate`, falling back to an "already running" error only if the signal can't be delivered — proven against both widgets' fixed ports (Codex 47850, Claude 47851).
 
-**Plans**: TBD
+**Plans:** 0/1 plans complete
+
+Plans:
+- [ ] 05-01-PLAN.md — Add `usage_widget_common.tray` (icon rendering, color/font/formatting/tooltip helpers) and `usage_widget_common.instance` (single-instance listener/notify), generalized from both widgets' already-shipped implementations (TRAYUI-01..06, INSTANCE-01)
+
 **UI hint**: yes
 
 ### Phase 6: Widget migration to shared modules
@@ -83,7 +87,7 @@ Full details: [.planning/milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 | 2. JSON provider integration | v1.0 | 3/3 | Complete | 2026-07-21 |
 | 3. Shared library extraction + Codex migration | v1.1 | 2/2 | Complete | 2026-07-22 |
 | 4. Claude widget adoption + bugfixes | v1.1 | 1/1 | Complete | 2026-07-22 |
-| 5. Shared tray/UI + single-instance library extraction | v1.2 | 0/TBD | Not started | - |
+| 5. Shared tray/UI + single-instance library extraction | v1.2 | 0/1 | Not started | - |
 | 6. Widget migration to shared modules | v1.2 | 0/TBD | Not started | - |
 
 *For full milestone details, see [.planning/milestones/](milestones/)*
