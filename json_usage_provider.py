@@ -27,6 +27,12 @@ from pathlib import Path
 import probe_wham_usage
 
 _SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
+if not _SIBLING_COMMON.is_dir():
+    raise SystemExit(
+        f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
+        "Clone it as a sibling of this repo (see README) before running "
+        "probe_wham_usage.py / the widget."
+    )
 if str(_SIBLING_COMMON) not in sys.path:
     sys.path.insert(0, str(_SIBLING_COMMON))
 

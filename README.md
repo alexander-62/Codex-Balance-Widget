@@ -22,12 +22,17 @@ system tray.
 - Python 3.10 or newer with Windows Python Launcher
 - Google Chrome
 - access to the Codex Usage page in your ChatGPT account
+- the `usage_widget_common` repo cloned as a sibling directory of this repo
+  (i.e. both repos share the same parent folder). `install.bat` warns if it
+  is missing.
 
 ## Install and Run
 
-1. Run `install.bat`.
-2. Run `run.bat`.
-3. On the first launch, sign in to ChatGPT in the Chrome window that opens.
+1. Clone `usage_widget_common` next to this repo (same parent folder), if you
+   have not already.
+2. Run `install.bat`.
+3. Run `run.bat`.
+4. On the first launch, sign in to ChatGPT in the Chrome window that opens.
 
 The app uses your system Google Chrome. It does not download Playwright
 Chromium.
