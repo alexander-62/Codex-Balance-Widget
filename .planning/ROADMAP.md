@@ -63,7 +63,10 @@ Plans:
   3. After a 401 (or other transient/auth) error, the widget retries using the shared backoff schedule (e.g. 30s → 60s → 120s) instead of waiting the full `refresh_seconds` interval before the next attempt.
   4. The widget runs end-to-end with the new wiring (manual verification), showing usage updates via the shared retry path with no behavioral regression versus prior behavior.
 
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 04-01-PLAN.md — Adopt usage_widget_common retry/error-classification; fix tooltip truncation and post-failure backoff; harden sibling-repo bootstrap (launcher/install-script/README parity)
 
 ## Progress
 
@@ -73,6 +76,6 @@ Plans:
 | 01.1. Address Phase 1 tech debt (INSERTED) | v1.0 | 1/1 | Complete | 2026-07-21 |
 | 2. JSON provider integration | v1.0 | 3/3 | Complete | 2026-07-21 |
 | 3. Shared library extraction + Codex migration | v1.1 | 2/2 | Complete    | 2026-07-22 |
-| 4. Claude widget adoption + bugfixes | v1.1 | 0/TBD | Not started | - |
+| 4. Claude widget adoption + bugfixes | v1.1 | 0/1 | Not started | - |
 
 *For full v1.0 details, see [.planning/milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
