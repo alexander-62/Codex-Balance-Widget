@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Shared usage-provider core
-status: Awaiting next milestone
-last_updated: "2026-07-22T19:22:25.667Z"
-last_activity: 2026-07-22 — Milestone v1.1 completed and archived
+milestone: v1.2
+milestone_name: Unify tray/UI layer
+status: planning
+last_updated: "2026-07-22T20:58:30.404Z"
+last_activity: 2026-07-22
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/ROADMAP.md (updated 2026-07-22)
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-22 — Milestone v1.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-22 — Milestone v1.2 started
 
 ## Performance Metrics
 

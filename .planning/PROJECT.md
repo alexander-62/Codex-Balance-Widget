@@ -23,6 +23,16 @@ Reliable, low-friction usage-limit visibility without opening a browser tab.
 
 (Defined per milestone — see `.planning/REQUIREMENTS.md`, created fresh by `/gsd-new-milestone`)
 
+## Current Milestone: v1.2 Unify tray/UI layer
+
+**Goal:** Extract the duplicated tray/UI logic (icon drawing, tooltip formatting, color/font helpers, tray menu structure) from both widgets into `usage_widget_common`, eliminating the copy-paste between `codex_balance_widget_chrome.py` and `claude_balance_widget_v1/claude_balance_widget.py`.
+
+**Target features:**
+- `create_tray_image()`, `usage_color()`, `load_tray_font()` — shared icon rendering
+- `build_tray_tooltip()` — shared tooltip template, parameterized for each widget's field set (Codex: 5h+weekly+credits; Claude: 5h+weekly)
+- `format_percent()`, `format_tray_reset()` — shared formatting helpers
+- Shared tray-menu structure (`_tray_toggle`/`_tray_refresh`/`_tray_open_site` equivalents)
+
 ### Out of Scope
 
 - Merging Claude and Codex widgets into a single process/tray icon — considered, rejected for now: keeps failure domains isolated (a provider bug in one widget shouldn't crash the other). Confirmed again during v1.1 (shared *code*, not shared *runtime*, was the chosen path). Revisit only as a deliberate later step.
