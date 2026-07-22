@@ -168,3 +168,7 @@ Both tasks followed the mandatory RED -> GREEN gate sequence:
 - Task 2: `test:` commit (`371fdfb`) precedes `feat:` commit (`2f5624a`); RED confirmed via `ModuleNotFoundError` before implementation existed.
 
 No REFACTOR-phase commits were needed (no post-GREEN cleanup required).
+
+## Self-Check: PASSED
+
+All 11 created files in `d:/00_Projects/usage_widget_common` verified present on disk. All 4 sibling-repo commit hashes (`ab43108`, `818632a`, `371fdfb`, `2f5624a`) verified present in `git -C /d/00_Projects/usage_widget_common log --oneline --all`. This SUMMARY.md and its own commit hash (`4f9ad4f`) verified present in the `codex_balance_widget` worktree's own git log.
