@@ -77,9 +77,10 @@ See Deferred Items below — 2 tracked todos, both pre-date this milestone.
 
 ### Blockers/Concerns
 
-- **Open question for Phase 3 planning**: exact filesystem location of the shared package (working name `usage_widget_common/`) is unresolved. This repo (`codex_balance_widget`) hosts `.planning/`, but Phase 4's consumer (`claude_balance_widget.py`) lives in the separate sibling repo `d:/00_Projects/claude_balance_widget_v1` (freshly git-initialized, no shared history). Options include: a new subdirectory in one of the two existing repos referenced cross-repo, a new third sibling repo/package, or another arrangement — must be resolved during Phase 3 planning/discussion, not assumed.
 - Widgets remain separate processes/tray icons in both phases (explicit constraint carried from PROJECT.md, not revisited this milestone).
 - Shared package must stay stdlib-only (no new third-party deps) — constraint applies to both phases.
+
+(Resolved: shared-package location question — `d:/00_Projects/usage_widget_common`, own sibling repo — decided in 03-CONTEXT.md, delivered in Phase 3.)
 
 ## Deferred Items
 
