@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Shared usage-provider core
-status: executing
-last_updated: "2026-07-22T16:46:16.252Z"
+status: ready_to_plan
+last_updated: 2026-07-22T18:09:30.216Z
 last_activity: 2026-07-22 -- Phase 3 execution started
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 2
   percent: 0
+stopped_at: Phase 3 complete (2/2) — ready to discuss Phase 4
 ---
 
 # Project State
@@ -20,14 +21,14 @@ progress:
 See: .planning/ROADMAP.md (updated 2026-07-22)
 
 **Core value:** Reliable, low-friction usage-limit visibility without opening a browser tab.
-**Current focus:** Phase 3 — shared-library-extraction-codex-migration
+**Current focus:** Phase 4 — claude widget adoption + bugfixes
 
 ## Current Position
 
-Phase: 3 (shared-library-extraction-codex-migration) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 3
-Last activity: 2026-07-22 -- Phase 3 execution started
+Phase: 4
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-22
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -35,7 +36,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 6 (v1.0)
+- Total plans completed: 8 (v1.0)
 - Average duration: see .planning/milestones/v1.0-MILESTONE-AUDIT.md
 - Total execution time: see .planning/milestones/v1.0-MILESTONE-AUDIT.md
 
@@ -48,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | 2 (v1.0) | 3 | - | - |
 | 3 (v1.1) | 0 | - | - |
 | 4 (v1.1) | 0 | - | - |
+| 3 | 2 | - | - |
 
 **Recent Trend:**
 

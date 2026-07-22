@@ -4,14 +4,14 @@
 
 ### Shared Library (usage_widget_common)
 
-- [ ] **SHARED-01**: New shared package provides an async retry-once wrapper for transient fetch errors (mirrors `json_usage_provider.py`'s `_fetch_with_retry` pattern), usable by both Codex and Claude widgets.
-- [ ] **SHARED-02**: Shared package provides error classification (a `retryable` flag distinguishing transient errors — network timeout/429/connection reset — from permanent ones — 401/403/malformed response).
-- [ ] **SHARED-03**: Shared package provides a redaction denylist + `redaction_clean()`-style post-check reusable by any widget that prints/logs API response fields, preventing token/PII leaks in stdout or log files.
-- [ ] **SHARED-04**: Shared package provides a pure fetch-decision skeleton (mirrors `plan_fetch_outcome`) expressing "primary source ok" / "primary source failed → fallback" / "both failed → retain existing data" as a testable pure function, parameterized so each widget supplies its own primary/fallback semantics.
+- [x] **SHARED-01**: New shared package provides an async retry-once wrapper for transient fetch errors (mirrors `json_usage_provider.py`'s `_fetch_with_retry` pattern), usable by both Codex and Claude widgets.
+- [x] **SHARED-02**: Shared package provides error classification (a `retryable` flag distinguishing transient errors — network timeout/429/connection reset — from permanent ones — 401/403/malformed response).
+- [x] **SHARED-03**: Shared package provides a redaction denylist + `redaction_clean()`-style post-check reusable by any widget that prints/logs API response fields, preventing token/PII leaks in stdout or log files.
+- [x] **SHARED-04**: Shared package provides a pure fetch-decision skeleton (mirrors `plan_fetch_outcome`) expressing "primary source ok" / "primary source failed → fallback" / "both failed → retain existing data" as a testable pure function, parameterized so each widget supplies its own primary/fallback semantics.
 
 ### Codex Widget Migration
 
-- [ ] **CODEX-01**: `json_usage_provider.py` and `probe_wham_usage.py` consume the shared package's retry/error-classification/redaction logic instead of their own local copies, with no behavior change (all 64 existing tests still pass unmodified in intent, though import paths change).
+- [x] **CODEX-01**: `json_usage_provider.py` and `probe_wham_usage.py` consume the shared package's retry/error-classification/redaction logic instead of their own local copies, with no behavior change (all 64 existing tests still pass unmodified in intent, though import paths change).
 
 ### Claude Widget Adoption + Bugfixes
 
@@ -34,11 +34,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SHARED-01 | Phase 3 | Pending |
-| SHARED-02 | Phase 3 | Pending |
-| SHARED-03 | Phase 3 | Pending |
-| SHARED-04 | Phase 3 | Pending |
-| CODEX-01 | Phase 3 | Pending |
+| SHARED-01 | Phase 3 | Complete |
+| SHARED-02 | Phase 3 | Complete |
+| SHARED-03 | Phase 3 | Complete |
+| SHARED-04 | Phase 3 | Complete |
+| CODEX-01 | Phase 3 | Complete |
 | CLAUDE-01 | Phase 4 | Pending |
 | CLAUDE-02 | Phase 4 | Pending |
 | CLAUDE-03 | Phase 4 | Pending |
