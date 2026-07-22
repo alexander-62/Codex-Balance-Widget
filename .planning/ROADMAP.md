@@ -34,7 +34,7 @@ Full details: [.planning/milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 ### Phase 3: Shared library extraction + Codex migration
 
-**Goal**: A new stdlib-only shared package (working name `usage_widget_common`; exact repo location is an open question — see STATE.md Blockers/Concerns) exposes retry-once, error-classification, redaction, and fetch-decision primitives extracted from Codex's already-proven `json_usage_provider.py` / `probe_wham_usage.py` patterns. The Codex widget consumes these from the shared package instead of its local copies, with no behavior change — proving the abstraction against real, tested code before the Claude widget (Phase 4) depends on it.
+**Goal**: A new stdlib-only shared package (`usage_widget_common`, hosted in its own sibling repo at `d:/00_Projects/usage_widget_common` — location resolved via 03-CONTEXT.md) exposes retry-once, error-classification, redaction, and fetch-decision primitives extracted from Codex's already-proven `json_usage_provider.py` / `probe_wham_usage.py` patterns. The Codex widget consumes these from the shared package instead of its local copies, with no behavior change — proving the abstraction against real, tested code before the Claude widget (Phase 4) depends on it.
 **Depends on**: v1.0 Phase 2 (JSON provider integration) — extracts the patterns that phase built
 **Requirements**: SHARED-01, SHARED-02, SHARED-03, SHARED-04, CODEX-01
 **Success Criteria** (what must be TRUE):
@@ -45,7 +45,11 @@ Full details: [.planning/milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   4. Inspecting the shared package's imports shows stdlib only — no third-party dependencies introduced.
   5. The shared fetch-decision function is parameterized by primary/fallback semantics rather than hardcoded to Codex's JSON/Chrome sources, so a different widget can supply its own.
 
-**Plans**: TBD
+**Plans:** 2 plans (2 waves)
+
+Plans:
+- [ ] 03-01-PLAN.md — Bootstrap `usage_widget_common` sibling repo; implement FetchError, redact/redaction_clean, fetch_with_retry_once, decide_fetch_source (SHARED-01..04)
+- [ ] 03-02-PLAN.md — Migrate `probe_wham_usage.py`, `json_usage_provider.py`, `codex_balance_widget_chrome.py` onto the shared package with no behavior change (CODEX-01)
 
 ### Phase 4: Claude widget adoption + bugfixes
 
@@ -68,7 +72,7 @@ Full details: [.planning/milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 | 1. JSON endpoint probe | v1.0 | 2/2 | Complete | 2026-07-20 |
 | 01.1. Address Phase 1 tech debt (INSERTED) | v1.0 | 1/1 | Complete | 2026-07-21 |
 | 2. JSON provider integration | v1.0 | 3/3 | Complete | 2026-07-21 |
-| 3. Shared library extraction + Codex migration | v1.1 | 0/TBD | Not started | - |
+| 3. Shared library extraction + Codex migration | v1.1 | 0/2 | Not started | - |
 | 4. Claude widget adoption + bugfixes | v1.1 | 0/TBD | Not started | - |
 
 *For full v1.0 details, see [.planning/milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
