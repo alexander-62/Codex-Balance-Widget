@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Shared usage-provider core
-status: ready_to_plan
-last_updated: 2026-07-22T18:09:30.216Z
-last_activity: 2026-07-22 -- Phase 3 execution started
+status: executing
+last_updated: "2026-07-22T18:36:32.764Z"
+last_activity: 2026-07-22 -- Phase 4 execution started
 progress:
   total_phases: 2
-  completed_phases: 0
-  total_plans: 2
+  completed_phases: 1
+  total_plans: 3
   completed_plans: 2
-  percent: 0
-stopped_at: Phase 3 complete (2/2) — ready to discuss Phase 4
+  percent: 50
 ---
 
 # Project State
@@ -21,14 +20,14 @@ stopped_at: Phase 3 complete (2/2) — ready to discuss Phase 4
 See: .planning/ROADMAP.md (updated 2026-07-22)
 
 **Core value:** Reliable, low-friction usage-limit visibility without opening a browser tab.
-**Current focus:** Phase 4 — claude widget adoption + bugfixes
+**Current focus:** Phase 4 — claude-widget-adoption-bugfixes
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-22
+Phase: 4 (claude-widget-adoption-bugfixes) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 4
+Last activity: 2026-07-22 -- Phase 4 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
