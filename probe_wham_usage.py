@@ -30,6 +30,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+_SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
+if str(_SIBLING_COMMON) not in sys.path:
+    sys.path.insert(0, str(_SIBLING_COMMON))
+
+from usage_widget_common.errors import FetchError
+from usage_widget_common.redaction import redact as _redact_generic, redaction_clean
+
 USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 FIVE_HOUR_SECONDS = 18000
 WEEKLY_SECONDS = 604800
@@ -48,17 +55,11 @@ REDACT_KEYS = frozenset(
 )
 
 
-class ProbeError(RuntimeError):
-    """Human-readable (Russian) diagnostic message — the only output on failure.
-
-    `retryable` (keyword-only, default False) marks transient error classes
-    (HTTP 429, network error, timeout — see fetch_usage) that are safe for a
-    caller to retry once. All other classes default to non-retryable.
-    """
-
-    def __init__(self, message: str, *, retryable: bool = False) -> None:
-        super().__init__(message)
-        self.retryable = retryable
+# Alias for usage_widget_common.errors.FetchError (Phase 3 extraction) — the
+# identical class object, so every existing ProbeError(...) construction,
+# isinstance(x, ProbeError) check, and except ProbeError clause (in this
+# file and in both test files) keeps working unchanged.
+ProbeError = FetchError
 
 
 def auth_json_path() -> Path:
@@ -238,26 +239,10 @@ def extract_fields(payload: dict) -> dict:
 def redact(obj: Any) -> Any:
     """Recursively replace sensitive values with "<redacted>".
 
-    Keys matched: REDACT_KEYS plus any key containing the substring
-    "token" (case-insensitive). Returns a new structure — never mutates
-    the input.
+    Keys matched: REDACT_KEYS (see usage_widget_common.redaction.redact for
+    the generic traversal + "token"-substring rule).
     """
-    if isinstance(obj, dict):
-        result: dict[Any, Any] = {}
-        for key, value in obj.items():
-            if isinstance(key, str) and (key in REDACT_KEYS or "token" in key.lower()):
-                result[key] = "<redacted>"
-            else:
-                result[key] = redact(value)
-        return result
-    if isinstance(obj, list):
-        return [redact(item) for item in obj]
-    return obj
-
-
-def redaction_clean(text: str) -> bool:
-    """Post-check: redacted text must contain neither a JWT prefix nor '@'."""
-    return "eyJ" not in text and "@" not in text
+    return _redact_generic(obj, REDACT_KEYS)
 
 
 def build_headers(access_token: str, account_id: str | None) -> dict[str, str]:
