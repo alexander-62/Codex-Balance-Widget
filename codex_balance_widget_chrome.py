@@ -46,27 +46,49 @@ except Exception as exc:  # Tray is optional: widget must still work without ext
     ImageFont = None
     TRAY_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
-import json_usage_provider
+try:
+    import json_usage_provider
 
-_SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
-if not _SIBLING_COMMON.is_dir():
-    # A plain Exception-based error (not SystemExit) so unittest/pytest's
-    # import machinery reports this cleanly as a normal ERROR instead of
-    # unittest silently aborting on an uncaught SystemExit (see
-    # 03-REVIEW.md WR-01, iteration 2). In practice `json_usage_provider`
-    # (imported above) already raises this same error first whenever the
-    # sibling repo is missing; this check stays as a defensive fallback.
-    # codex_balance_widget_launcher.pyw catches ModuleNotFoundError and
-    # shows a messagebox for the end-user-facing launch path.
-    raise ModuleNotFoundError(
-        f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
-        "Clone it as a sibling of this repo (see README) before running "
-        "probe_wham_usage.py / the widget."
-    )
-if str(_SIBLING_COMMON) not in sys.path:
-    sys.path.insert(0, str(_SIBLING_COMMON))
+    _SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
+    if not _SIBLING_COMMON.is_dir():
+        # A plain Exception-based error (not SystemExit) so unittest/pytest's
+        # import machinery reports this cleanly as a normal ERROR instead of
+        # unittest silently aborting on an uncaught SystemExit (see
+        # 03-REVIEW.md WR-01, iteration 2). In practice `json_usage_provider`
+        # (imported above) already raises this same error first whenever the
+        # sibling repo is missing; this check stays as a defensive fallback.
+        # codex_balance_widget_launcher.pyw catches ModuleNotFoundError and
+        # shows a messagebox for the end-user-facing launch path.
+        raise ModuleNotFoundError(
+            f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
+            "Clone it as a sibling of this repo (see README) before running "
+            "probe_wham_usage.py / the widget."
+        )
+    if str(_SIBLING_COMMON) not in sys.path:
+        sys.path.insert(0, str(_SIBLING_COMMON))
 
-from usage_widget_common.fetch_decision import decide_fetch_source
+    from usage_widget_common.fetch_decision import decide_fetch_source
+except ModuleNotFoundError as exc:
+    # This file has no other entry point of its own: the ModuleNotFoundError
+    # above (or the same error raised transitively by json_usage_provider.py
+    # / probe_wham_usage.py's own bootstrap checks) happens at import time,
+    # before the `if __name__ == "__main__":` block at the bottom of this
+    # file is ever reached, so that block alone cannot catch it.
+    if __name__ == "__main__":
+        # Run directly (py -3 codex_balance_widget_chrome.py, the README's
+        # own documented debug command) or via the launcher's
+        # runpy.run_path(..., run_name="__main__"): convert to SystemExit so
+        # a clean one-line diagnostic is shown instead of the raw, multi-
+        # frame traceback from the transitive usage_widget_common bootstrap
+        # chain (see 03-REVIEW.md WR-02, iteration 3). When launched via
+        # codex_balance_widget_launcher.pyw, its own `except SystemExit`
+        # clause still shows the user-facing messagebox for this.
+        raise SystemExit(str(exc)) from None
+    # Imported as a module (by unittest, or any future importer) with
+    # __name__ != "__main__": re-raise unchanged so it is reported as a
+    # normal ERROR, matching json_usage_provider.py's and
+    # probe_wham_usage.py's own import-time behavior.
+    raise
 
 APP_VERSION = "v13-zero-seconds-weekly-block"
 APP_DIR = Path(__file__).resolve().parent
