@@ -15,8 +15,12 @@ including under --debug.
 Only stdlib is used directly by this module (json, os, sys, base64,
 argparse, urllib.request, urllib.error, datetime, pathlib), plus the
 sibling `usage_widget_common` package (also stdlib-only) reached via a
-sys.path bootstrap — see the top of this file. That sibling repo must be
-cloned next to this one (see README) or the bootstrap raises SystemExit.
+sys.path bootstrap — see the top of this file. If that sibling repo is
+missing, this raises SystemExit when run directly as a script
+(py -3 probe_wham_usage.py) or ModuleNotFoundError when imported (e.g. by
+unittest, or by json_usage_provider.py / codex_balance_widget_chrome.py).
+It must be present as a sibling directory of this repo (see README for how
+to obtain it — it is not published, so `git clone <url>` will not work).
 """
 
 from __future__ import annotations

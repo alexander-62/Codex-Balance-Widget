@@ -15,10 +15,15 @@ fallback signal" policy (see 02-CONTEXT.md D-02/D-03):
 Only stdlib is used directly by this module (asyncio, dataclasses) plus
 probe_wham_usage itself and the sibling `usage_widget_common` package
 (also stdlib-only) reached via a sys.path bootstrap — see the top of this
-file. That sibling repo must be cloned next to this one (see README) or
-the bootstrap raises SystemExit. No Tk/UI dependency, but note that
+file. This module has no `__main__` case of its own, so if that sibling
+repo is missing, importing it always raises ModuleNotFoundError (never
+SystemExit) — whether imported directly, by unittest, or transitively via
+codex_balance_widget_chrome.py. No Tk/UI dependency, but note that
 importing this module DOES have a side effect: it mutates sys.path (and
-will raise SystemExit if usage_widget_common is missing).
+will raise ModuleNotFoundError if usage_widget_common is missing). The
+sibling repo must be present as a sibling directory of this repo (see
+README for how to obtain it — it is not published, so `git clone <url>`
+will not work).
 """
 
 from __future__ import annotations
