@@ -251,7 +251,7 @@ def redact(obj: Any) -> Any:
     Keys matched: REDACT_KEYS (see usage_widget_common.redaction.redact for
     the generic traversal + "token"-substring rule).
     """
-    return _redact_generic(obj, REDACT_KEYS)
+    return _redact_generic(obj, keys=REDACT_KEYS)
 
 
 def build_headers(access_token: str, account_id: str | None) -> dict[str, str]:
