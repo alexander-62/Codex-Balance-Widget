@@ -50,7 +50,15 @@ import json_usage_provider
 
 _SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
 if not _SIBLING_COMMON.is_dir():
-    raise SystemExit(
+    # A plain Exception-based error (not SystemExit) so unittest/pytest's
+    # import machinery reports this cleanly as a normal ERROR instead of
+    # unittest silently aborting on an uncaught SystemExit (see
+    # 03-REVIEW.md WR-01, iteration 2). In practice `json_usage_provider`
+    # (imported above) already raises this same error first whenever the
+    # sibling repo is missing; this check stays as a defensive fallback.
+    # codex_balance_widget_launcher.pyw catches ModuleNotFoundError and
+    # shows a messagebox for the end-user-facing launch path.
+    raise ModuleNotFoundError(
         f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
         "Clone it as a sibling of this repo (see README) before running "
         "probe_wham_usage.py / the widget."

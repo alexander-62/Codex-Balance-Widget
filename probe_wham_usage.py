@@ -35,11 +35,23 @@ from typing import Any
 
 _SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
 if not _SIBLING_COMMON.is_dir():
-    raise SystemExit(
+    _sibling_missing_msg = (
         f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
         "Clone it as a sibling of this repo (see README) before running "
         "probe_wham_usage.py / the widget."
     )
+    if __name__ == "__main__":
+        # Run directly (py -3 probe_wham_usage.py / python -m
+        # probe_wham_usage): fail loudly with SystemExit so this standalone
+        # CLI still gets a clean one-line diagnostic instead of a raw
+        # traceback.
+        raise SystemExit(_sibling_missing_msg)
+    # Imported as a module (by unittest, json_usage_provider.py,
+    # codex_balance_widget_chrome.py, etc.): raise a plain Exception-based
+    # error instead of SystemExit so unittest/pytest's import machinery
+    # reports it cleanly as a normal ERROR (SystemExit is a BaseException
+    # and is not caught the same way — see 03-REVIEW.md WR-01, iteration 2).
+    raise ModuleNotFoundError(_sibling_missing_msg)
 if str(_SIBLING_COMMON) not in sys.path:
     sys.path.insert(0, str(_SIBLING_COMMON))
 
