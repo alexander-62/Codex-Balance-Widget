@@ -32,15 +32,13 @@
 
 ## Traceability
 
-(Filled by roadmapper)
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SHARED-01 | — | Pending |
-| SHARED-02 | — | Pending |
-| SHARED-03 | — | Pending |
-| SHARED-04 | — | Pending |
-| CODEX-01 | — | Pending |
-| CLAUDE-01 | — | Pending |
-| CLAUDE-02 | — | Pending |
-| CLAUDE-03 | — | Pending |
+| SHARED-01 | Phase 3 | Pending |
+| SHARED-02 | Phase 3 | Pending |
+| SHARED-03 | Phase 3 | Pending |
+| SHARED-04 | Phase 3 | Pending |
+| CODEX-01 | Phase 3 | Pending |
+| CLAUDE-01 | Phase 4 | Pending |
+| CLAUDE-02 | Phase 4 | Pending |
+| CLAUDE-03 | Phase 4 | Pending |
