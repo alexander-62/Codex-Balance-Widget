@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Shared usage-provider core
-status: milestone_complete
-last_updated: 2026-07-22T19:13:57.743Z
-last_activity: 2026-07-22 -- Phase 4 execution started
+status: Awaiting next milestone
+last_updated: "2026-07-22T19:22:25.667Z"
+last_activity: 2026-07-22 — Milestone v1.1 completed and archived
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
   completed_plans: 3
-  percent: 50
-stopped_at: Milestone complete (Phase 4 was final phase)
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +24,10 @@ See: .planning/ROADMAP.md (updated 2026-07-22)
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-07-22
-
-Progress: [░░░░░░░░░░] 0%
+Phase: Milestone v1.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-22 — Milestone v1.1 completed and archived
 
 ## Performance Metrics
 
@@ -89,8 +86,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| todo | claude-widget-tooltip-and-401-retry.md | now scheduled — addressed by v1.1 Phase 4 (CLAUDE-02, CLAUDE-03) | v1.0 close, 2026-07-21 |
-| todo | codex-5h-none-partial-parse.md | still pending — re-triaged as likely not-a-bug; not pulled into v1.1 (see REQUIREMENTS.md Future Requirements) | v1.0 close, 2026-07-21 |
+| todo | claude-widget-tooltip-and-401-retry.md | RESOLVED — fixed and closed by v1.1 Phase 4 (CLAUDE-02, CLAUDE-03), todo file removed 2026-07-22 | v1.0 close, 2026-07-21 |
+| todo | codex-5h-none-partial-parse.md | still pending — re-triaged as likely not-a-bug (JSON endpoint confirms no 5h limit on this account, matches widget's honest report); not pulled into v1.1, remains for a future session with real evidence of an actual bug | v1.0 close, 2026-07-21 |
+| verification_gap | Phase 04 (04-VERIFICATION.md) — human_needed | acknowledged and deferred at v1.1 close — no live run against real Claude Code credentials occurred this session (machine has no .credentials.json); all automated evidence passed; user explicitly chose to continue without live validation rather than block | v1.1 close, 2026-07-22 |
 
 ## Session Continuity
 
@@ -100,4 +98,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run `/gsd-plan-phase 3` to begin planning Phase 3 (Shared library extraction + Codex migration). Resolve the shared-package-location open question (see Blockers/Concerns) during that planning/discussion step.
+- Start the next milestone with /gsd-new-milestone

@@ -1,5 +1,17 @@
 # Milestones
 
+## v1.1 Shared usage-provider core (Shipped: 2026-07-22)
+
+**Phases completed:** 2 phases, 3 plans, 7 tasks
+
+**Key accomplishments:**
+
+- New stdlib-only sibling repo `d:/00_Projects/usage_widget_common` extracts and generalizes Codex's proven `FetchError`/`redact`/`fetch_with_retry_once`/`plan_fetch_outcome` primitives into a source-agnostic, independently-tested package with its own 4-commit git history.
+- `probe_wham_usage.py`, `json_usage_provider.py`, and `codex_balance_widget_chrome.py` now import their retry-once, error-classification, redaction, and fetch-decision logic from the sibling `usage_widget_common` package via `sys.path` insertion, with all 64 pre-existing tests passing byte-for-byte unmodified.
+- `claude_balance_widget.py` now delegates retry/error-classification to `usage_widget_common.retry.fetch_with_retry_once`/`errors.FetchError`, truncates tray tooltips to 127 chars, and backs off 30s/60s/120s after consecutive fetch failures — all shipped with the hardened sibling-repo-missing bootstrap from day one.
+
+---
+
 ## v1.0 JSON provider integration MVP (Shipped: 2026-07-21)
 
 **Phases completed:** 3 phases, 6 plans, 12 tasks
