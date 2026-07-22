@@ -15,9 +15,9 @@
 
 ### Claude Widget Adoption + Bugfixes
 
-- [ ] **CLAUDE-01**: `claude_balance_widget.py` adopts the shared package's retry-once wrapper and error classification for its usage-fetch calls.
-- [ ] **CLAUDE-02**: Tray tooltip is truncated to 127 characters (not 160), preventing the `ValueError: string too long (142, maximum length 128)` crash from `build_tray_tooltip()`.
-- [ ] **CLAUDE-03**: After a 401 (or other transient/auth error), the widget retries quickly using the shared package's backoff (e.g. 30s → 60s → 120s) instead of waiting the full `refresh_seconds` interval before the next attempt.
+- [x] **CLAUDE-01**: `claude_balance_widget.py` adopts the shared package's retry-once wrapper and error classification for its usage-fetch calls.
+- [x] **CLAUDE-02**: Tray tooltip is truncated to 127 characters (not 160), preventing the `ValueError: string too long (142, maximum length 128)` crash from `build_tray_tooltip()`.
+- [x] **CLAUDE-03**: After a 401 (or other transient/auth error), the widget retries quickly using the shared package's backoff (e.g. 30s → 60s → 120s) instead of waiting the full `refresh_seconds` interval before the next attempt.
 
 ## Future Requirements (Deferred)
 
@@ -39,6 +39,6 @@
 | SHARED-03 | Phase 3 | Complete |
 | SHARED-04 | Phase 3 | Complete |
 | CODEX-01 | Phase 3 | Complete |
-| CLAUDE-01 | Phase 4 | Pending |
-| CLAUDE-02 | Phase 4 | Pending |
-| CLAUDE-03 | Phase 4 | Pending |
+| CLAUDE-01 | Phase 4 | Complete |
+| CLAUDE-02 | Phase 4 | Complete |
+| CLAUDE-03 | Phase 4 | Complete |

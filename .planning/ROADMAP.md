@@ -76,6 +76,6 @@ Plans:
 | 01.1. Address Phase 1 tech debt (INSERTED) | v1.0 | 1/1 | Complete | 2026-07-21 |
 | 2. JSON provider integration | v1.0 | 3/3 | Complete | 2026-07-21 |
 | 3. Shared library extraction + Codex migration | v1.1 | 2/2 | Complete    | 2026-07-22 |
-| 4. Claude widget adoption + bugfixes | v1.1 | 1/1 | Complete   | 2026-07-22 |
+| 4. Claude widget adoption + bugfixes | v1.1 | 1/1 | Complete    | 2026-07-22 |
 
 *For full v1.0 details, see [.planning/milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*

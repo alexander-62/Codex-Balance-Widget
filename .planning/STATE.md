@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Shared usage-provider core
-status: executing
-last_updated: "2026-07-22T18:36:32.764Z"
+status: milestone_complete
+last_updated: 2026-07-22T19:13:57.743Z
 last_activity: 2026-07-22 -- Phase 4 execution started
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 50
+stopped_at: Milestone complete (Phase 4 was final phase)
 ---
 
 # Project State
@@ -20,14 +21,14 @@ progress:
 See: .planning/ROADMAP.md (updated 2026-07-22)
 
 **Core value:** Reliable, low-friction usage-limit visibility without opening a browser tab.
-**Current focus:** Phase 4 — claude-widget-adoption-bugfixes
+**Current focus:** Milestone complete
 
 ## Current Position
 
-Phase: 4 (claude-widget-adoption-bugfixes) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 4
-Last activity: 2026-07-22 -- Phase 4 execution started
+Phase: 4
+Plan: Not started
+Status: Milestone complete
+Last activity: 2026-07-22
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -35,7 +36,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 8 (v1.0)
+- Total plans completed: 9 (v1.0)
 - Average duration: see .planning/milestones/v1.0-MILESTONE-AUDIT.md
 - Total execution time: see .planning/milestones/v1.0-MILESTONE-AUDIT.md
 
@@ -49,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 | 3 (v1.1) | 0 | - | - |
 | 4 (v1.1) | 0 | - | - |
 | 3 | 2 | - | - |
+| 4 | 1 | - | - |
 
 **Recent Trend:**
 
