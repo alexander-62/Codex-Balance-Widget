@@ -19,6 +19,7 @@ import msvcrt
 import os
 import re
 import shutil
+import sys
 import threading
 import tkinter as tk
 import traceback
@@ -46,6 +47,12 @@ except Exception as exc:  # Tray is optional: widget must still work without ext
     TRAY_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
 import json_usage_provider
+
+_SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
+if str(_SIBLING_COMMON) not in sys.path:
+    sys.path.insert(0, str(_SIBLING_COMMON))
+
+from usage_widget_common.fetch_decision import decide_fetch_source
 
 APP_VERSION = "v13-zero-seconds-weekly-block"
 APP_DIR = Path(__file__).resolve().parent
@@ -576,30 +583,41 @@ def plan_fetch_outcome(
     suffix = f" · {tr(language, 'Chrome fallback', 'Chrome-фолбэк')}"
     fallback_log = f"JSON fetch failed ({json_error}); Chrome fallback status={chrome_status} error={chrome_error or ''}"
 
-    if chrome_status == "ok" and chrome_text:
-        balance = BalanceParser.parse(chrome_text)
-        if balance.has_usage_data:
-            if is_weekly_limit_exhausted(balance):
-                message = tr(language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан") + suffix
-            else:
-                message = tr(language, "Data is up to date", "Данные актуальны") + suffix
-            return FetchOutcome("chrome", balance, message, "Balance updated (source: chrome)")
-        if has_existing_data:
+    # Delegate the 3-way primary/fallback/retain-existing choice to the
+    # shared usage_widget_common.fetch_decision.decide_fetch_source (Phase 3
+    # extraction). primary_ok is always False here: this branch is only
+    # reached once json_status has already been established as failed above.
+    # Chrome's own source-specific statuses (browser_error/login_required)
+    # stay local -- they are sub-branches of the "none" decision, not part
+    # of the shared 3-way skeleton.
+    chrome_balance = BalanceParser.parse(chrome_text) if (chrome_status == "ok" and chrome_text) else None
+    fallback_ok = chrome_balance is not None and chrome_balance.has_usage_data
+    decision = decide_fetch_source(primary_ok=False, fallback_ok=fallback_ok, has_existing_data=has_existing_data)
+
+    if decision.source == "fallback":
+        balance = chrome_balance
+        if is_weekly_limit_exhausted(balance):
+            message = tr(language, "Codex unavailable: weekly limit exhausted", "Codex недоступен: недельный лимит исчерпан") + suffix
+        else:
+            message = tr(language, "Data is up to date", "Данные актуальны") + suffix
+        return FetchOutcome("chrome", balance, message, "Balance updated (source: chrome)")
+
+    if decision.source == "retain_existing":
+        if chrome_balance is not None:
             message = tr(language, "Showing last saved data · new data not recognized", "Показаны последние данные · новые не распознаны") + suffix
-            return FetchOutcome("none", None, message, fallback_log)
-        message = tr(language, "Data not recognized", "Данные не распознаны") + suffix
+        else:
+            message = tr(language, "Showing last saved data · refresh failed", "Показаны последние данные · обновить не удалось") + suffix
         return FetchOutcome("none", None, message, fallback_log)
 
-    if has_existing_data:
-        message = tr(language, "Showing last saved data · refresh failed", "Показаны последние данные · обновить не удалось") + suffix
-        return FetchOutcome("none", None, message, fallback_log)
-    if chrome_status == "browser_error":
+    # decision.source == "none" (has_existing_data is False)
+    if chrome_balance is not None:
+        message = tr(language, "Data not recognized", "Данные не распознаны") + suffix
+    elif chrome_status == "browser_error":
         message = tr(language, "Chrome failed to start. See widget_launch.log", "Chrome не запустился. Подробности в widget_launch.log")
-        return FetchOutcome("none", None, message, fallback_log)
-    if chrome_status == "login_required":
+    elif chrome_status == "login_required":
         message = tr(language, "Sign in to ChatGPT. Click Refresh to open Chrome.", "Нужен вход в ChatGPT. Нажмите Обновить, чтобы открыть Chrome.")
-        return FetchOutcome("none", None, message, fallback_log)
-    message = tr(language, "Usage data timed out. Click Refresh.", "Не дождался данных Usage. Нажмите Обновить.") + suffix
+    else:
+        message = tr(language, "Usage data timed out. Click Refresh.", "Не дождался данных Usage. Нажмите Обновить.") + suffix
     return FetchOutcome("none", None, message, fallback_log)
 
 
