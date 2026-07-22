@@ -22,14 +22,18 @@ system tray.
 - Python 3.10 or newer with Windows Python Launcher
 - Google Chrome
 - access to the Codex Usage page in your ChatGPT account
-- the `usage_widget_common` repo cloned as a sibling directory of this repo
-  (i.e. both repos share the same parent folder). `install.bat` warns if it
-  is missing.
+- a sibling directory `../usage_widget_common` (i.e. both repos share the
+  same parent folder) containing the `usage_widget_common` shared package.
+  This is a local, unpublished package — it has no public git remote or PyPI
+  listing, so it cannot be obtained with `git clone <url>`. If you don't
+  already have it, get it from wherever this project's `usage_widget_common`
+  repo is hosted/shared with you (ask the maintainer, or copy the folder
+  manually). `install.bat` warns if it is missing.
 
 ## Install and Run
 
-1. Clone `usage_widget_common` next to this repo (same parent folder), if you
-   have not already.
+1. Make sure `usage_widget_common` is present as a sibling directory of this
+   repo (same parent folder) — see Requirements above for how to obtain it.
 2. Run `install.bat`.
 3. Run `run.bat`.
 4. On the first launch, sign in to ChatGPT in the Chrome window that opens.
