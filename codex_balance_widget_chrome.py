@@ -19,6 +19,7 @@ import msvcrt
 import os
 import re
 import shutil
+import socket
 import sys
 import threading
 import tkinter as tk
@@ -96,6 +97,7 @@ CODEX_USAGE_URL = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
 PROFILE_DIR = APP_DIR / "codex_chrome_profile"
 LOG_PATH = APP_DIR / "widget_launch.log"
 APP_LOCK_PATH = APP_DIR / "codex_balance_widget.lock"
+SINGLE_INSTANCE_PORT = 47850
 SETTINGS_PATH = APP_DIR / "codex_balance_widget_settings.json"
 HISTORY_PATH = APP_DIR / "codex_balance_history.json"
 SETTINGS_ICON_PATH = APP_DIR / "settings_icon.png"
@@ -141,6 +143,7 @@ MUTED = "#6B7280"
 BORDER = "#D9DEE7"
 TRACK = "#E8ECF2"
 GREEN = "#12B76A"
+TRAY_BRAND_BORDER = "#1E88E5"  # blue — distinguishes Codex's tray icon from Claude's
 ORANGE = "#F79009"
 RED = "#D92D20"
 BLUE = "#2E90FA"
@@ -277,6 +280,16 @@ def acquire_app_lock():
     return lock_file
 
 
+def notify_running_instance() -> bool:
+    """Ask the already-running instance to raise its window. Returns True if delivered."""
+    try:
+        with socket.create_connection(("127.0.0.1", SINGLE_INSTANCE_PORT), timeout=1.0):
+            pass
+        return True
+    except OSError:
+        return False
+
+
 def find_chrome_executable() -> str | None:
     env_path = os.environ.get("CHROME_PATH")
     if env_path and Path(env_path).exists():
@@ -365,11 +378,16 @@ def is_weekly_limit_exhausted(balance: Balance) -> bool:
     return safe_int(balance.weekly_percent) == 0
 
 
-def effective_codex_percent(balance: Balance) -> int | None:
-    """Availability indicator: weekly 0 blocks Codex regardless of the 5-hour value."""
+def effective_codex_metric(balance: Balance) -> tuple[int | None, bool]:
+    """Availability indicator as (percent, is_weekly). Weekly 0 blocks Codex regardless of
+    the 5-hour value; when 5h is simply absent from the API response (e.g. plans with no
+    5-hour limit at all), falls back to the weekly percent instead of showing unknown."""
     if is_weekly_limit_exhausted(balance):
-        return 0
-    return safe_int(balance.five_hour_percent)
+        return 0, True
+    five_hour = safe_int(balance.five_hour_percent)
+    if five_hour is not None:
+        return five_hour, False
+    return safe_int(balance.weekly_percent), True
 
 
 def normalize_reset_text(text: str | None) -> str | None:
@@ -1376,7 +1394,7 @@ def load_tray_font(size: int):
         return None
 
 
-def create_tray_image(percent: int | None):
+def create_tray_image(percent: int | None, *, border_color: str | None = None, metric_badge: str | None = None):
     if Image is None or ImageDraw is None:
         return None
 
@@ -1384,7 +1402,14 @@ def create_tray_image(percent: int | None):
     bg_color = usage_color(percent) if percent is not None else MUTED
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((2, 2, size - 2, size - 2), radius=14, fill=hex_to_rgb(bg_color) + (255,))
+    outline_rgb = hex_to_rgb(border_color) + (255,) if border_color else None
+    draw.rounded_rectangle(
+        (2, 2, size - 2, size - 2),
+        radius=14,
+        fill=hex_to_rgb(bg_color) + (255,),
+        outline=outline_rgb,
+        width=3 if outline_rgb else 0,
+    )
 
     if percent is None:
         label = "?"
@@ -1421,6 +1446,23 @@ def create_tray_image(percent: int | None):
         stroke_width=1,
         stroke_fill=(255, 255, 255, 255),
     )
+
+    if metric_badge:
+        badge_font = load_tray_font(20) or font
+        badge_bbox = draw.textbbox((0, 0), metric_badge, font=badge_font)
+        badge_w = badge_bbox[2] - badge_bbox[0]
+        badge_h = badge_bbox[3] - badge_bbox[1]
+        badge_x = size - badge_w - badge_bbox[0] - 6
+        badge_y = size - badge_h - badge_bbox[1] - 6
+        draw.text(
+            (badge_x, badge_y),
+            metric_badge,
+            fill=(255, 255, 255, 255),
+            font=badge_font,
+            stroke_width=2,
+            stroke_fill=(0, 0, 0, 255),
+        )
+
     return image
 
 
@@ -1453,10 +1495,16 @@ class CodexBalanceWidget:
         self.root.title(" ")
         self.root.geometry(str(self.app_settings.get("geometry", DEFAULT_GEOMETRY)))
         self.root.minsize(MIN_WIDTH, MIN_HEIGHT)
+        self.root.resizable(False, False)
+        try:
+            self.root.attributes("-toolwindow", True)
+        except tk.TclError:
+            pass
         self.root.configure(bg=BG)
         self.root.attributes("-topmost", self.always_on_top)
         self._install_blank_icon()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        self._start_single_instance_listener()
 
         self.status_var = tk.StringVar(value=tr(self.language, "Starting...", "Запуск..."))
         self.five_hour_title_var = tk.StringVar(value=tr(self.language, "5 hours", "5 часов"))
@@ -1670,7 +1718,12 @@ class CodexBalanceWidget:
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem(tr(self.language, "Exit", "Выход"), self._tray_exit_app),
             )
-            icon_image = create_tray_image(effective_codex_percent(self.current_balance))
+            _icon_percent, _icon_is_weekly = effective_codex_metric(self.current_balance)
+            icon_image = create_tray_image(
+                _icon_percent,
+                border_color=TRAY_BRAND_BORDER,
+                metric_badge="W" if _icon_is_weekly else None,
+            )
             self.tray_icon = pystray.Icon(
                 "codex_balance_widget",
                 icon_image,
@@ -1707,8 +1760,12 @@ class CodexBalanceWidget:
         if not self.tray_icon or pystray is None or Image is None:
             return
         try:
-            percent = effective_codex_percent(self.current_balance)
-            icon_image = create_tray_image(percent)
+            percent, is_weekly = effective_codex_metric(self.current_balance)
+            icon_image = create_tray_image(
+                percent,
+                border_color=TRAY_BRAND_BORDER,
+                metric_badge="W" if is_weekly else None,
+            )
             if icon_image is not None:
                     self.tray_icon.icon = icon_image
             self.tray_icon.title = build_tray_tooltip(
@@ -1727,6 +1784,35 @@ class CodexBalanceWidget:
             self.root.after(0, callback)
         except RuntimeError:
             pass
+
+    def _start_single_instance_listener(self) -> None:
+        """Listen on a local-only port so a second launch can raise this window instead of erroring."""
+        try:
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind(("127.0.0.1", SINGLE_INSTANCE_PORT))
+            server.listen(1)
+        except OSError as exc:
+            write_log(f"Single-instance listener failed to bind: {type(exc).__name__}: {exc}")
+            return
+
+        def _serve() -> None:
+            while not self.is_exiting:
+                try:
+                    conn, _ = server.accept()
+                except OSError:
+                    break
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+                self._run_on_ui(self.show_window_from_tray)
+            try:
+                server.close()
+            except OSError:
+                pass
+
+        threading.Thread(target=_serve, daemon=True, name="single-instance-listener").start()
 
     def _tray_toggle_window(self, _icon=None, _item=None) -> None:
         self._run_on_ui(self.toggle_window_visibility)
@@ -2368,7 +2454,8 @@ class CodexBalanceWidget:
 if __name__ == "__main__":
     app_lock = acquire_app_lock()
     if not app_lock:
-        messagebox.showinfo(WINDOW_TITLE, "Виджет уже запущен.")
+        if not notify_running_instance():
+            messagebox.showinfo(WINDOW_TITLE, "Виджет уже запущен.")
         raise SystemExit
 
     atexit.register(app_lock.close)
