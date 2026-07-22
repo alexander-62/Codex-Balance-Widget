@@ -3,6 +3,7 @@ title: "Claude-виджет: обрезка tooltip до 127 и быстрый �
 date: 2026-07-17
 priority: high
 project: d:\00_Projects\claude_balance_widget_v1
+resolves_phase: 4
 ---
 
 Два подтверждённых логом бага в `claude_balance_widget.py`:
