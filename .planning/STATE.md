@@ -1,14 +1,14 @@
 ---
-gsd_state_version: '1.0'
+gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Shared usage-provider core
-status: planning
-last_updated: "2026-07-22T00:00:00.000Z"
-last_activity: 2026-07-22
+status: executing
+last_updated: "2026-07-22T16:46:16.252Z"
+last_activity: 2026-07-22 -- Phase 3 execution started
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -20,14 +20,14 @@ progress:
 See: .planning/ROADMAP.md (updated 2026-07-22)
 
 **Core value:** Reliable, low-friction usage-limit visibility without opening a browser tab.
-**Current focus:** Phase 3 — Shared library extraction + Codex migration
+**Current focus:** Phase 3 — shared-library-extraction-codex-migration
 
 ## Current Position
 
-Phase: 3 of 4 (v1.1: Shared library extraction + Codex migration)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-07-22 — Roadmap created for milestone v1.1 (Phases 3-4), 8/8 requirements mapped
+Phase: 3 (shared-library-extraction-codex-migration) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 3
+Last activity: 2026-07-22 -- Phase 3 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
