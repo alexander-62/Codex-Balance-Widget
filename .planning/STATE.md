@@ -27,7 +27,7 @@ See: .planning/ROADMAP.md (updated 2026-07-23)
 Phase: 5 of 6 overall (v1.2 Phase 1 of 2) — Shared tray/UI + single-instance library extraction
 Plan: — (not yet planned)
 Status: Ready to plan
-Last activity: 2026-07-23 — v1.2 ROADMAP.md re-created to cover all 9 current requirements (previous draft only covered 6); Phase 5 now TRAYUI-01..06 + INSTANCE-01, Phase 6 now CODEXUI-01/CLAUDEUI-01; REQUIREMENTS.md traceability updated, 9/9 mapped
+Last activity: 2026-09-09 - Completed quick task 260909-r1: show Codex usage limit reset credits in the balance widget
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -86,6 +86,12 @@ See Deferred Items below — 2 tracked todos, both pre-date this milestone.
 - Widgets remain separate processes/tray icons in both phases (explicit constraint carried from PROJECT.md, not revisited this milestone).
 - Shared package must stay stdlib-only aside from the existing Pillow/pystray stack — no new third-party deps, per PROJECT.md constraints and REQUIREMENTS.md Out of Scope.
 - v1.1 Phase 3/4 directories (`.planning/phases/03-*`, `04-*`) remain unarchived intentionally, pending a live-credentials verification the user is holding off on — do not move/touch them; not a blocker for v1.2 phase numbering (v1.2 starts fresh at Phase 5).
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260909-r1 | Show Codex usage limit reset credits in the balance widget | 2026-09-09 | f00613f | [260909-r1-codex-reset-credits](./quick/260909-r1-codex-reset-credits/) |
 
 ## Deferred Items
 
