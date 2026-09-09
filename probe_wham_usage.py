@@ -229,6 +229,77 @@ def _credits_text(credits_obj: Any) -> str | None:
     return None
 
 
+def _count_text(value: Any) -> str | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else str(value)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _reset_credit_expiry_text(value: Any) -> str | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M")
+        except (OverflowError, OSError, ValueError):
+            return None
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _collect_reset_credit_expiries(obj: Any) -> list[str]:
+    expiry_keys = {
+        "expires_at",
+        "expires",
+        "expiry_at",
+        "expiry",
+        "expires_on",
+        "expiresAt",
+        "expiration",
+        "expiration_time",
+    }
+    found: list[str] = []
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key in expiry_keys:
+                expiry = _reset_credit_expiry_text(value)
+                if expiry:
+                    found.append(expiry)
+            elif isinstance(value, (dict, list)):
+                found.extend(_collect_reset_credit_expiries(value))
+    elif isinstance(obj, list):
+        for item in obj:
+            found.extend(_collect_reset_credit_expiries(item))
+    return found
+
+
+def _reset_credits_fields(reset_credits_obj: Any) -> dict:
+    if not isinstance(reset_credits_obj, dict):
+        return {
+            "reset_credits_available": None,
+            "reset_credits_applicable": None,
+            "reset_credits_expiry_text": None,
+        }
+
+    expiries: list[str] = []
+    for expiry in _collect_reset_credit_expiries(reset_credits_obj):
+        if expiry not in expiries:
+            expiries.append(expiry)
+
+    return {
+        "reset_credits_available": _count_text(reset_credits_obj.get("available_count")),
+        "reset_credits_applicable": _count_text(reset_credits_obj.get("applicable_available_count")),
+        "reset_credits_expiry_text": "; ".join(expiries[:3]) if expiries else None,
+    }
+
+
 def extract_fields(payload: dict) -> dict:
     """Map the raw wham/usage payload onto the Balance model's terms.
 
@@ -247,6 +318,7 @@ def extract_fields(payload: dict) -> dict:
         "weekly_reset_text": _reset_text(weekly),
         "windows": windows,
     }
+    fields.update(_reset_credits_fields(payload.get("rate_limit_reset_credits")))
 
     missing = [
         name
@@ -407,6 +479,9 @@ def main(argv: list[str] | None = None) -> int:
             "five_hour_percent",
             "weekly_percent",
             "credits",
+            "reset_credits_available",
+            "reset_credits_applicable",
+            "reset_credits_expiry_text",
             "five_hour_reset_text",
             "weekly_reset_text",
         ):

@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from codex_balance_widget_chrome import (
     Balance,
+    BalanceParser,
     CodexBalanceWidget,
     FetchResult,
     build_balance_from_json_fields,
@@ -26,6 +27,13 @@ from json_usage_provider import JsonFetchResult
 
 CHROME_TEXT_WITH_USAGE = (
     "5-hour usage limit 87% remaining Weekly usage limit 42% remaining Credits remaining 12"
+)
+CHROME_TEXT_WITH_USAGE_RESETS = (
+    "5-hour usage limit 87% remaining Weekly usage limit 78% remaining Credits remaining 0 "
+    "Usage limit resets Use a reset to restore your 5-hour limit, weekly limit, or both. "
+    "Full reset (Weekly + 5 hr) Expires Oct 4, 4:04 AM Use reset "
+    "Full reset (Weekly + 5 hr) Expires Oct 5, 1:41 AM Use reset "
+    "Auto reload Auto-reload credits"
 )
 CHROME_TEXT_NO_USAGE = "nothing relevant here at all"
 
@@ -60,6 +68,9 @@ class TestBuildBalanceFromJsonFields(unittest.TestCase):
             "five_hour_percent": None,
             "weekly_percent": "84",
             "credits": "0",
+            "reset_credits_available": "2",
+            "reset_credits_applicable": "0",
+            "reset_credits_expiry_text": None,
             "five_hour_reset_text": None,
             "weekly_reset_text": "2026-07-27 18:33",
             "windows": [],
@@ -72,6 +83,9 @@ class TestBuildBalanceFromJsonFields(unittest.TestCase):
                 five_hour_percent=None,
                 weekly_percent="84",
                 credits="0",
+                reset_credits_available="2",
+                reset_credits_applicable="0",
+                reset_credits_expiry_text=None,
                 five_hour_reset_text=None,
                 weekly_reset_text="2026-07-27 18:33",
             ),
@@ -82,6 +96,9 @@ class TestBuildBalanceFromJsonFields(unittest.TestCase):
             "five_hour_percent": "10",
             "weekly_percent": "20",
             "credits": "5",
+            "reset_credits_available": "1",
+            "reset_credits_applicable": "1",
+            "reset_credits_expiry_text": "2026-10-04 04:04",
             "five_hour_reset_text": "2026-07-27 18:33",
             "weekly_reset_text": "2026-08-01 00:00",
             "windows": [{"foo": "bar"}],
@@ -90,6 +107,13 @@ class TestBuildBalanceFromJsonFields(unittest.TestCase):
         balance = build_balance_from_json_fields(fields)
         self.assertEqual(balance.five_hour_percent, "10")
         self.assertEqual(balance.weekly_percent, "20")
+        self.assertEqual(balance.reset_credits_available, "1")
+        self.assertEqual(balance.reset_credits_expiry_text, "2026-10-04 04:04")
+
+    def test_chrome_text_maps_usage_limit_resets(self):
+        balance = BalanceParser.parse(CHROME_TEXT_WITH_USAGE_RESETS)
+        self.assertEqual(balance.reset_credits_available, "2")
+        self.assertEqual(balance.reset_credits_expiry_text, "Oct 4, 4:04 AM; Oct 5, 1:41 AM")
 
 
 class TestPlanFetchOutcome(unittest.TestCase):

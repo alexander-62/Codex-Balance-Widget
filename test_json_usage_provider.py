@@ -38,6 +38,10 @@ _PAYLOAD = {
         "unlimited": False,
         "balance": "0",
     },
+    "rate_limit_reset_credits": {
+        "available_count": 2,
+        "applicable_available_count": 0,
+    },
 }
 
 
@@ -122,6 +126,7 @@ class TestJsonUsageProviderFetch(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.retried)
         self.assertEqual(mock_fetch_usage.call_count, 1)
         self.assertEqual(result.fields["weekly_percent"], "84")
+        self.assertEqual(result.fields["reset_credits_available"], "2")
 
 
 if __name__ == "__main__":

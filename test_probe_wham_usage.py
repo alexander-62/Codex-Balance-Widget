@@ -144,13 +144,31 @@ class TestExtract(unittest.TestCase):
                 "unlimited": False,
                 "balance": "0",
             },
+            "rate_limit_reset_credits": {
+                "available_count": 2,
+                "applicable_available_count": 0,
+            },
         }
         fields = probe_wham_usage.extract_fields(payload)
         self.assertEqual(fields["weekly_percent"], "84")
         self.assertIsNone(fields["five_hour_percent"])
         self.assertEqual(fields["credits"], "0")
+        self.assertEqual(fields["reset_credits_available"], "2")
+        self.assertEqual(fields["reset_credits_applicable"], "0")
+        self.assertIsNone(fields["reset_credits_expiry_text"])
         self.assertIn("20", fields["weekly_reset_text"])
         self.assertIn("five_hour", fields["missing"])
+
+    def test_extract_reset_credit_future_expiry_fields(self):
+        payload = {
+            "rate_limit_reset_credits": {
+                "available_count": 1,
+                "resets": [{"expires_at": 1785816240}],
+            },
+        }
+        fields = probe_wham_usage.extract_fields(payload)
+        self.assertEqual(fields["reset_credits_available"], "1")
+        self.assertEqual(fields["reset_credits_expiry_text"], "2026-08-04 07:04")
 
 
 class TestRedact(unittest.TestCase):

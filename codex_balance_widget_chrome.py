@@ -243,12 +243,21 @@ class Balance:
     five_hour_percent: str | None = None
     weekly_percent: str | None = None
     credits: str | None = None
+    reset_credits_available: str | None = None
+    reset_credits_applicable: str | None = None
+    reset_credits_expiry_text: str | None = None
     five_hour_reset_text: str | None = None
     weekly_reset_text: str | None = None
 
     @property
     def has_usage_data(self) -> bool:
-        return any([self.five_hour_percent, self.weekly_percent, self.credits])
+        return any([
+            self.five_hour_percent,
+            self.weekly_percent,
+            self.credits,
+            self.reset_credits_available,
+            self.reset_credits_applicable,
+        ])
 
 
 @dataclass
@@ -580,12 +589,39 @@ def format_compact_countdown(reset_dt: datetime | None, language: str = DEFAULT_
     return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
+def normalize_reset_credits_expiry_text(text: str | None) -> str | None:
+    if not text:
+        return None
+    items = [normalize_reset_text(item) for item in str(text).split(";")]
+    items = [item for item in items if item]
+    return "; ".join(items[:3]) if items else None
+
+
+def format_reset_credits_line(
+    available: str | None,
+    applicable: str | None,
+    expiry_text: str | None,
+    language: str = DEFAULT_LANGUAGE,
+) -> str:
+    available_text = available if available is not None else tr(language, "not found", "not found")
+    parts = [tr(language, f"Resets: {available_text}", f"Resets: {available_text}")]
+    if applicable is not None and applicable != available:
+        parts.append(tr(language, f"applicable now: {applicable}", f"applicable now: {applicable}"))
+    expiry = normalize_reset_credits_expiry_text(expiry_text)
+    if expiry:
+        parts.append(tr(language, f"expires {expiry}", f"expires {expiry}"))
+    return " · ".join(parts)
+
+
 def build_balance_from_json_fields(fields: dict) -> Balance:
     """Map probe_wham_usage.extract_fields() output onto Balance, no text parsing."""
     return Balance(
         five_hour_percent=fields.get("five_hour_percent"),
         weekly_percent=fields.get("weekly_percent"),
         credits=fields.get("credits"),
+        reset_credits_available=fields.get("reset_credits_available"),
+        reset_credits_applicable=fields.get("reset_credits_applicable"),
+        reset_credits_expiry_text=normalize_reset_credits_expiry_text(fields.get("reset_credits_expiry_text")),
         five_hour_reset_text=normalize_reset_text(fields.get("five_hour_reset_text")),
         weekly_reset_text=normalize_reset_text(fields.get("weekly_reset_text")),
     )
@@ -710,6 +746,8 @@ class BalanceParser:
             ],
         )
 
+        reset_credits_available, reset_credits_expiry = BalanceParser._usage_limit_resets(normalized)
+
         reset_matches = BalanceParser._reset_matches(normalized)
         warning_reset = BalanceParser._limit_warning_reset(normalized)
         five_hour_reset = BalanceParser._reset_after(
@@ -734,6 +772,9 @@ class BalanceParser:
             five_hour_percent=five_hour,
             weekly_percent=weekly,
             credits=credits,
+            reset_credits_available=reset_credits_available,
+            reset_credits_applicable=None,
+            reset_credits_expiry_text=reset_credits_expiry,
             five_hour_reset_text=normalize_reset_text(five_hour_reset),
             weekly_reset_text=normalize_reset_text(weekly_reset),
         )
@@ -745,6 +786,30 @@ class BalanceParser:
             if match:
                 return match.group(1)
         return None
+
+    @staticmethod
+    def _usage_limit_resets(text: str) -> tuple[str | None, str | None]:
+        section_match = re.search(
+            r"Usage limit resets(?P<section>.*?)(?:Auto reload|Auto-reload|$)",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if not section_match:
+            return None, None
+
+        section = section_match.group("section")
+        count = len(re.findall(r"\bUse reset\b", section, flags=re.IGNORECASE))
+        expiries = [
+            normalize_reset_text(item)
+            for item in re.findall(
+                r"\bExpires\s+([^;]+?)(?=\s+(?:Full reset|Use reset|Auto reload|Auto-reload|$))",
+                section,
+                flags=re.IGNORECASE,
+            )
+        ]
+        expiries = [item for item in expiries if item]
+        expiry_text = "; ".join(expiries[:3]) if expiries else None
+        return (str(count) if count else None), expiry_text
 
     @staticmethod
     def _reset_matches(text: str) -> list[str]:
@@ -957,6 +1022,9 @@ class HistoryStore:
             "weekly_percent": weekly_percent,
             "five_hour_percent": five_hour_percent,
             "credits": balance.credits,
+            "reset_credits_available": balance.reset_credits_available,
+            "reset_credits_applicable": balance.reset_credits_applicable,
+            "reset_credits_expiry_text": normalize_reset_credits_expiry_text(balance.reset_credits_expiry_text),
             "weekly_reset_text": normalize_reset_text(balance.weekly_reset_text),
             "weekly_reset_datetime": weekly_reset_dt.isoformat(timespec="seconds") if weekly_reset_dt else None,
             "five_hour_reset_text": normalize_reset_text(balance.five_hour_reset_text),
@@ -994,6 +1062,9 @@ class HistoryStore:
                 five_hour_percent=str(five_hour_percent) if five_hour_percent is not None else None,
                 weekly_percent=str(weekly_percent) if weekly_percent is not None else None,
                 credits=str(item.get("credits")) if item.get("credits") is not None else None,
+                reset_credits_available=str(item.get("reset_credits_available")) if item.get("reset_credits_available") is not None else None,
+                reset_credits_applicable=str(item.get("reset_credits_applicable")) if item.get("reset_credits_applicable") is not None else None,
+                reset_credits_expiry_text=item.get("reset_credits_expiry_text") if isinstance(item.get("reset_credits_expiry_text"), str) else None,
                 five_hour_reset_text=item.get("five_hour_reset_text") if isinstance(item.get("five_hour_reset_text"), str) else None,
                 weekly_reset_text=item.get("weekly_reset_text") if isinstance(item.get("weekly_reset_text"), str) else None,
             )
@@ -1514,6 +1585,7 @@ class CodexBalanceWidget:
         self.credits_var = tk.StringVar(value=tr(self.language, "Credits: ...", "Кредиты: ..."))
         self.five_hour_reset_var = tk.StringVar(value=tr(self.language, "Reset: not found", "Сброс: не найден"))
         self.weekly_reset_var = tk.StringVar(value=tr(self.language, "Reset: not found", "Сброс: не найден"))
+        self.reset_credits_var = tk.StringVar(value=tr(self.language, "Resets: ...", "Resets: ..."))
         self.updated_var = tk.StringVar(value="")
 
         self.settings_icon_image: tk.PhotoImage | None = None
@@ -1568,7 +1640,8 @@ class CodexBalanceWidget:
 
         credits_card = tk.Frame(outer, bg=CARD_BG, highlightbackground=BORDER, highlightthickness=1)
         credits_card.pack(fill="x", pady=(0, 8))
-        tk.Label(credits_card, textvariable=self.credits_var, font=("Segoe UI", 10, "bold"), bg=CARD_BG, fg=TEXT).pack(anchor="w", padx=10, pady=8)
+        tk.Label(credits_card, textvariable=self.credits_var, font=("Segoe UI", 10, "bold"), bg=CARD_BG, fg=TEXT).pack(anchor="w", padx=10, pady=(8, 1))
+        tk.Label(credits_card, textvariable=self.reset_credits_var, font=("Segoe UI", 8), bg=CARD_BG, fg=MUTED).pack(anchor="w", padx=10, pady=(0, 8))
 
         buttons = tk.Frame(outer, bg=BG)
         buttons.pack(fill="x", pady=(2, 0))
@@ -1946,6 +2019,15 @@ class CodexBalanceWidget:
         self.update_weekly_value_display()
         self.credits_var.set(tr(self.language, f"Credits: {credits}", f"Кредиты: {credits}"))
 
+        self.reset_credits_var.set(
+            format_reset_credits_line(
+                balance.reset_credits_available,
+                balance.reset_credits_applicable,
+                balance.reset_credits_expiry_text,
+                self.language,
+            )
+        )
+
         self.five_hour_progress.set_value(0 if weekly_percent == 0 else five_hour_percent)
         self.weekly_progress.set_value(weekly_percent)
 
@@ -1969,7 +2051,8 @@ class CodexBalanceWidget:
             write_log(
                 "Parsed balance: "
                 f"5h={balance.five_hour_percent!r}, 5h_reset={balance.five_hour_reset_text!r}, "
-                f"week={balance.weekly_percent!r}, week_reset={balance.weekly_reset_text!r}, credits={balance.credits!r}"
+                f"week={balance.weekly_percent!r}, week_reset={balance.weekly_reset_text!r}, "
+                f"credits={balance.credits!r}, resets={balance.reset_credits_available!r}"
             )
 
         self.root.after(0, apply)

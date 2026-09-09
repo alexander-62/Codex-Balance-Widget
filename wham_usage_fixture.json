@@ -33,7 +33,7 @@
   "rate_limit_reached_type": null,
   "rate_limit_reset_credits": {
     "applicable_available_count": 0,
-    "available_count": 3
+    "available_count": 2
   },
   "spend_control": {
     "individual_limit": "<redacted>",
