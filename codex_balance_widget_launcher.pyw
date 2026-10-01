@@ -38,11 +38,7 @@ except SystemExit as exc:
             pass
         messagebox.showerror("Codex Balance Widget", f"Widget failed to start:\n\n{exc.code}")
 except ModuleNotFoundError as exc:
-    # The usage_widget_common sibling-repo bootstrap check (probe_wham_usage.py
-    # / json_usage_provider.py / codex_balance_widget_chrome.py) raises this as
-    # a plain, catchable exception rather than SystemExit so unittest/pytest
-    # still report it cleanly as an import error (03-REVIEW.md WR-01,
-    # iteration 2). Surface the same clean diagnostic to the GUI user here.
+    # Report missing installed dependencies even when launched without a console.
     try:
         write_log(f"Widget exited during startup: {exc}")
     except OSError:

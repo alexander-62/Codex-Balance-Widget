@@ -19,6 +19,7 @@ from codex_balance_widget_chrome import (
     CodexBalanceWidget,
     FetchResult,
     build_balance_from_json_fields,
+    five_hour_time_remaining_percent,
     parse_reset_datetime,
     plan_fetch_outcome,
     tr,
@@ -60,6 +61,22 @@ class TestParseResetDatetimeIso(unittest.TestCase):
 
     def test_garbage_text_returns_none(self):
         self.assertIsNone(parse_reset_datetime("мусор без даты"))
+
+
+class TestFiveHourTimeRemainingPercent(unittest.TestCase):
+    def test_returns_none_without_reset_datetime(self):
+        self.assertIsNone(five_hour_time_remaining_percent(None))
+
+    def test_counts_down_inside_five_hour_window(self):
+        now = datetime(2026, 9, 9, 10, 0)
+        self.assertEqual(five_hour_time_remaining_percent(datetime(2026, 9, 9, 15, 0), now=now), 100)
+        self.assertEqual(five_hour_time_remaining_percent(datetime(2026, 9, 9, 12, 30), now=now), 50)
+        self.assertEqual(five_hour_time_remaining_percent(datetime(2026, 9, 9, 10, 0), now=now), 0)
+
+    def test_clamps_outside_window_bounds(self):
+        now = datetime(2026, 9, 9, 10, 0)
+        self.assertEqual(five_hour_time_remaining_percent(datetime(2026, 9, 9, 20, 0), now=now), 100)
+        self.assertEqual(five_hour_time_remaining_percent(datetime(2026, 9, 9, 9, 0), now=now), 0)
 
 
 class TestBuildBalanceFromJsonFields(unittest.TestCase):

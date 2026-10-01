@@ -20,7 +20,6 @@ import os
 import re
 import shutil
 import socket
-import sys
 import threading
 import tkinter as tk
 import traceback
@@ -47,49 +46,9 @@ except Exception as exc:  # Tray is optional: widget must still work without ext
     ImageFont = None
     TRAY_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
-try:
-    import json_usage_provider
+import json_usage_provider
+from usage_widget_common.fetch_decision import decide_fetch_source
 
-    _SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
-    if not _SIBLING_COMMON.is_dir():
-        # A plain Exception-based error (not SystemExit) so unittest/pytest's
-        # import machinery reports this cleanly as a normal ERROR instead of
-        # unittest silently aborting on an uncaught SystemExit (see
-        # 03-REVIEW.md WR-01, iteration 2). In practice `json_usage_provider`
-        # (imported above) already raises this same error first whenever the
-        # sibling repo is missing; this check stays as a defensive fallback.
-        # codex_balance_widget_launcher.pyw catches ModuleNotFoundError and
-        # shows a messagebox for the end-user-facing launch path.
-        raise ModuleNotFoundError(
-            f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
-            "Clone it as a sibling of this repo (see README) before running "
-            "probe_wham_usage.py / the widget."
-        )
-    if str(_SIBLING_COMMON) not in sys.path:
-        sys.path.insert(0, str(_SIBLING_COMMON))
-
-    from usage_widget_common.fetch_decision import decide_fetch_source
-except ModuleNotFoundError as exc:
-    # This file has no other entry point of its own: the ModuleNotFoundError
-    # above (or the same error raised transitively by json_usage_provider.py
-    # / probe_wham_usage.py's own bootstrap checks) happens at import time,
-    # before the `if __name__ == "__main__":` block at the bottom of this
-    # file is ever reached, so that block alone cannot catch it.
-    if __name__ == "__main__":
-        # Run directly (py -3 codex_balance_widget_chrome.py, the README's
-        # own documented debug command) or via the launcher's
-        # runpy.run_path(..., run_name="__main__"): convert to SystemExit so
-        # a clean one-line diagnostic is shown instead of the raw, multi-
-        # frame traceback from the transitive usage_widget_common bootstrap
-        # chain (see 03-REVIEW.md WR-02, iteration 3). When launched via
-        # codex_balance_widget_launcher.pyw, its own `except SystemExit`
-        # clause still shows the user-facing messagebox for this.
-        raise SystemExit(str(exc)) from None
-    # Imported as a module (by unittest, or any future importer) with
-    # __name__ != "__main__": re-raise unchanged so it is reported as a
-    # normal ERROR, matching json_usage_provider.py's and
-    # probe_wham_usage.py's own import-time behavior.
-    raise
 
 APP_VERSION = "v13-zero-seconds-weekly-block"
 APP_DIR = Path(__file__).resolve().parent
@@ -587,6 +546,16 @@ def format_compact_countdown(reset_dt: datetime | None, language: str = DEFAULT_
         day_suffix = tr(language, "d", "д")
         return f"{days}{day_suffix} {hours:02d}:{minutes:02d}:{seconds:02d}"
     return f"{hours}:{minutes:02d}:{seconds:02d}"
+
+
+def five_hour_time_remaining_percent(reset_dt: datetime | None, *, now: datetime | None = None) -> int | None:
+    if reset_dt is None:
+        return None
+    current = now or datetime.now()
+    remaining_seconds = (reset_dt - current).total_seconds()
+    window_seconds = 5 * 60 * 60
+    percent = round(max(0, min(window_seconds, remaining_seconds)) / window_seconds * 100)
+    return int(percent)
 
 
 def normalize_reset_credits_expiry_text(text: str | None) -> str | None:
@@ -1625,8 +1594,10 @@ class CodexBalanceWidget:
             value_var=self.five_hour_value_var,
             reset_var=self.five_hour_reset_var,
             use_chart=False,
+            show_time_progress=True,
         )
         self.five_hour_progress = self.five_hour_card["progress"]
+        self.five_hour_time_progress = self.five_hour_card["time_progress"]
 
         self.weekly_card = self._build_limit_card(
             outer,
@@ -1634,6 +1605,7 @@ class CodexBalanceWidget:
             value_var=self.weekly_value_var,
             reset_var=self.weekly_reset_var,
             use_chart=True,
+            show_time_progress=False,
         )
         self.weekly_progress = self.weekly_card["progress"]
         self.weekly_chart = self.weekly_card["chart"]
@@ -1641,7 +1613,7 @@ class CodexBalanceWidget:
         credits_card = tk.Frame(outer, bg=CARD_BG, highlightbackground=BORDER, highlightthickness=1)
         credits_card.pack(fill="x", pady=(0, 8))
         tk.Label(credits_card, textvariable=self.credits_var, font=("Segoe UI", 10, "bold"), bg=CARD_BG, fg=TEXT).pack(anchor="w", padx=10, pady=(8, 1))
-        tk.Label(credits_card, textvariable=self.reset_credits_var, font=("Segoe UI", 8), bg=CARD_BG, fg=MUTED).pack(anchor="w", padx=10, pady=(0, 8))
+        tk.Label(credits_card, textvariable=self.reset_credits_var, font=("Segoe UI", 10, "bold"), bg=CARD_BG, fg=TEXT).pack(anchor="w", padx=10, pady=(0, 8))
 
         buttons = tk.Frame(outer, bg=BG)
         buttons.pack(fill="x", pady=(2, 0))
@@ -1652,7 +1624,16 @@ class CodexBalanceWidget:
 
         tk.Label(outer, textvariable=self.status_var, font=("Segoe UI", 8), bg=BG, fg=MUTED).pack(anchor="w", pady=(8, 0))
 
-    def _build_limit_card(self, master, *, title_var: tk.StringVar, value_var: tk.StringVar, reset_var: tk.StringVar, use_chart: bool) -> dict:
+    def _build_limit_card(
+        self,
+        master,
+        *,
+        title_var: tk.StringVar,
+        value_var: tk.StringVar,
+        reset_var: tk.StringVar,
+        use_chart: bool,
+        show_time_progress: bool,
+    ) -> dict:
         card = tk.Frame(master, bg=CARD_BG, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="x", pady=(0, 8))
 
@@ -1670,6 +1651,11 @@ class CodexBalanceWidget:
             chart = WeeklyBurndownCanvas(card, height=58)
             # It is packed only after enough weekly history is available.
 
+        time_progress = None
+        if show_time_progress:
+            time_progress = ProgressBar(card, height=8)
+            time_progress.pack(fill="x", padx=10, pady=(0, 6))
+
         reset_label = tk.Label(card, textvariable=reset_var, font=("Segoe UI", 8), bg=CARD_BG, fg=MUTED)
         reset_label.pack(anchor="w", padx=10, pady=(0, 8))
 
@@ -1677,6 +1663,7 @@ class CodexBalanceWidget:
             "card": card,
             "value_label": value_label,
             "progress": progress,
+            "time_progress": time_progress,
             "chart": chart,
             "reset_label": reset_label,
         }
@@ -2002,6 +1989,13 @@ class CodexBalanceWidget:
         )
         value_label.configure(fg=usage_color(weekly_percent), font=("Segoe UI", 12, "bold"))
 
+    def update_five_hour_time_progress(self) -> None:
+        reset_dt = parse_reset_datetime(self.current_balance.five_hour_reset_text)
+        if is_weekly_limit_exhausted(self.current_balance):
+            self.five_hour_time_progress.set_value(None, BLUE)
+            return
+        self.five_hour_time_progress.set_value(five_hour_time_remaining_percent(reset_dt), BLUE)
+
     def apply_balance_ui(
         self,
         balance: Balance,
@@ -2029,6 +2023,7 @@ class CodexBalanceWidget:
         )
 
         self.five_hour_progress.set_value(0 if weekly_percent == 0 else five_hour_percent)
+        self.update_five_hour_time_progress()
         self.weekly_progress.set_value(weekly_percent)
 
         if append_history:
@@ -2095,6 +2090,7 @@ class CodexBalanceWidget:
         self.weekly_reset_var.set(format_countdown(weekly_dt, self.current_balance.weekly_reset_text, self.language))
         self.update_five_hour_value_display()
         self.update_weekly_value_display()
+        self.update_five_hour_time_progress()
         self.update_weekly_chart()
         now = datetime.now()
         if (

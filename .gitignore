@@ -20,3 +20,16 @@ widget_launch.log
 
 # Local diagnostic snapshots
 Codex*.mhtml
+
+# Development and audit artifacts
+.pytest_cache/
+.artifacts/
+.agents/
+.claude/
+.codex/
+
+# Local credentials
+.env
+.env.*
+!.env.example
+auth.json

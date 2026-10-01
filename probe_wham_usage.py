@@ -12,15 +12,7 @@ redacted fixture file.
 The access token is kept out of stdout, logs and any error message,
 including under --debug.
 
-Only stdlib is used directly by this module (json, os, sys, base64,
-argparse, urllib.request, urllib.error, datetime, pathlib), plus the
-sibling `usage_widget_common` package (also stdlib-only) reached via a
-sys.path bootstrap — see the top of this file. If that sibling repo is
-missing, this raises SystemExit when run directly as a script
-(py -3 probe_wham_usage.py) or ModuleNotFoundError when imported (e.g. by
-unittest, or by json_usage_provider.py / codex_balance_widget_chrome.py).
-It must be present as a sibling directory of this repo (see README for how
-to obtain it — it is not published, so `git clone <url>` will not work).
+Uses stdlib and the bundled usage_widget_common package.
 """
 
 from __future__ import annotations
@@ -36,28 +28,6 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-_SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
-if not _SIBLING_COMMON.is_dir():
-    _sibling_missing_msg = (
-        f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
-        "Clone it as a sibling of this repo (see README) before running "
-        "probe_wham_usage.py / the widget."
-    )
-    if __name__ == "__main__":
-        # Run directly (py -3 probe_wham_usage.py / python -m
-        # probe_wham_usage): fail loudly with SystemExit so this standalone
-        # CLI still gets a clean one-line diagnostic instead of a raw
-        # traceback.
-        raise SystemExit(_sibling_missing_msg)
-    # Imported as a module (by unittest, json_usage_provider.py,
-    # codex_balance_widget_chrome.py, etc.): raise a plain Exception-based
-    # error instead of SystemExit so unittest/pytest's import machinery
-    # reports it cleanly as a normal ERROR (SystemExit is a BaseException
-    # and is not caught the same way — see 03-REVIEW.md WR-01, iteration 2).
-    raise ModuleNotFoundError(_sibling_missing_msg)
-if str(_SIBLING_COMMON) not in sys.path:
-    sys.path.insert(0, str(_SIBLING_COMMON))
 
 from usage_widget_common.errors import FetchError
 from usage_widget_common.redaction import redact as _redact_generic, redaction_clean

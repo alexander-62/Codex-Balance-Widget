@@ -12,44 +12,15 @@ fallback signal" policy (see 02-CONTEXT.md D-02/D-03):
   error, timeout) -> exactly one retry after a short delay, then give
   up regardless of the outcome (D-03).
 
-Only stdlib is used directly by this module (asyncio, dataclasses) plus
-probe_wham_usage itself and the sibling `usage_widget_common` package
-(also stdlib-only) reached via a sys.path bootstrap — see the top of this
-file. This module has no `__main__` case of its own, so if that sibling
-repo is missing, importing it always raises ModuleNotFoundError (never
-SystemExit) — whether imported directly, by unittest, or transitively via
-codex_balance_widget_chrome.py. No Tk/UI dependency, but note that
-importing this module DOES have a side effect: it mutates sys.path (and
-will raise ModuleNotFoundError if usage_widget_common is missing). The
-sibling repo must be present as a sibling directory of this repo (see
-README for how to obtain it — it is not published, so `git clone <url>`
-will not work).
+Uses stdlib and the bundled usage_widget_common package. No UI dependency.
 """
 
 from __future__ import annotations
 
 import asyncio
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 
 import probe_wham_usage
-
-_SIBLING_COMMON = Path(__file__).resolve().parent.parent / "usage_widget_common"
-if not _SIBLING_COMMON.is_dir():
-    # A plain Exception-based error (not SystemExit) so unittest/pytest's
-    # import machinery reports this cleanly as a normal ERROR instead of
-    # unittest silently aborting on an uncaught SystemExit (see
-    # 03-REVIEW.md WR-01, iteration 2). In practice `probe_wham_usage.py`
-    # (imported above) already raises this same error first whenever the
-    # sibling repo is missing; this check stays as a defensive fallback.
-    raise ModuleNotFoundError(
-        f"usage_widget_common not found at {_SIBLING_COMMON}.\n"
-        "Clone it as a sibling of this repo (see README) before running "
-        "probe_wham_usage.py / the widget."
-    )
-if str(_SIBLING_COMMON) not in sys.path:
-    sys.path.insert(0, str(_SIBLING_COMMON))
 
 from usage_widget_common.retry import fetch_with_retry_once
 
