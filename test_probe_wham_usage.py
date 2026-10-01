@@ -14,7 +14,7 @@ import json
 import tempfile
 import unittest
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
@@ -168,7 +168,9 @@ class TestExtract(unittest.TestCase):
         }
         fields = probe_wham_usage.extract_fields(payload)
         self.assertEqual(fields["reset_credits_available"], "1")
-        self.assertEqual(fields["reset_credits_expiry_text"], "2026-08-04 07:04")
+        # The UI displays local time; the same instant differs on UTC CI hosts.
+        expected_local = datetime(2026, 8, 4, 4, 4, tzinfo=timezone.utc).astimezone()
+        self.assertEqual(fields["reset_credits_expiry_text"], expected_local.strftime("%Y-%m-%d %H:%M"))
 
 
 class TestRedact(unittest.TestCase):
